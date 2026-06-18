@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import BorderGlow from './components/BorderGlow';
-const overdeskLogo = 'https://raw.githubusercontent.com/Bl3551nq/Overdesk-Logos/refs/heads/main/OVERDESK-fx%20calendar.svg';
+const overdeskLogo = 'https://raw.githubusercontent.com/Bl3551nq/Overdesk-Logos/refs/heads/main/Overdesk%20Nexus.svg';
 import FxCalendar, { playSynthSound } from './components/FxCalendar';
 
 // Declaration to access global Electron API from preload script

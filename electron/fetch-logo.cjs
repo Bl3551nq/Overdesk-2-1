@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 async function fetchLogo() {
-  const url = 'https://raw.githubusercontent.com/Bl3551nq/Overdesk-Logos/refs/heads/main/OVERDESK-fx%20calendar.svg';
+  const url = 'https://raw.githubusercontent.com/Bl3551nq/Overdesk-Logos/refs/heads/main/Overdesk%20Nexus.svg';
   console.log(`Fetching SVG from: ${url}`);
   try {
     const res = await fetch(url);

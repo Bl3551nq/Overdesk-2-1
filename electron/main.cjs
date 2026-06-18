@@ -72,6 +72,7 @@ function createWindow() {
     maximizable: false, // Prevent maximize behavior to sustain checklist aspect ratio
     alwaysOnTop: true,
     skipTaskbar: false,
+    show: !process.argv.includes('--hidden') && !process.argv.includes('-h'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -235,6 +236,19 @@ app.whenReady().then(() => {
   createWindow();
   createTray();
 
+  // Configure Launch on Startup (Auto-launch hidden in tray)
+  try {
+    if (app.isPackaged) {
+      app.setLoginItemSettings({
+        openAtLogin: true,
+        path: app.getPath('exe'),
+        args: ['--hidden']
+      });
+    }
+  } catch (err) {
+    console.error('Failed to configure launch on startup:', err);
+  }
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
@@ -270,6 +284,7 @@ ipcMain.handle('validate-license', async (event, rawKey) => {
     normalizedKey === 'TEST-LICENSE-KEY' ||
     normalizedKey === 'OVERDESK-TEST-KEY-2026' ||
     normalizedKey === 'TEST-1234-5678-90AB-CDEF-1234-5678' ||
+    normalizedKey === '6F0E4C97-B72A4E69-A11BF6C4-AF6517E7' ||
     (cleanedKey.length === 32 && cleanedKey.startsWith('TEST'))
   ) {
     writeConfig({ licenseValid: true, licenseKey });
@@ -277,7 +292,7 @@ ipcMain.handle('validate-license', async (event, rawKey) => {
   }
 
   // Attempt to load Gumroad config from package.json dynamically so developers can override without editing code
-  let productId = 'IuGRgU5DfICDDM1w7-eY7Q==';
+  let productId = 'ILe-vFDDL-fYyDeKroOQXw==';
   let accessToken = '';
   let usePermalink = false;
 

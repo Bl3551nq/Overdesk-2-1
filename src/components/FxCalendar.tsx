@@ -1177,7 +1177,7 @@ export default function FxCalendar({
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingRight: '28px', color: isLight ? '#64748b' : '#94a3b8', fontSize: '10px', fontWeight: '500' }}>
                   <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#94a3b8', boxShadow: '0 0 6px #94a3b8', flexShrink: 0 }} />
-                  <span>No scheduled Events</span>
+                  <span>No Scheduled Events</span>
                 </div>
               )}
             </div>
@@ -1189,7 +1189,7 @@ export default function FxCalendar({
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingRight: '28px', color: isLight ? '#64748b' : '#94a3b8', fontSize: '10px', fontWeight: '500' }}>
                   <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#94a3b8', boxShadow: '0 0 6px #94a3b8', flexShrink: 0 }} />
-                  <span>No scheduled Events</span>
+                  <span>No Scheduled Events</span>
                 </div>
               )}
             </div>
@@ -1374,7 +1374,7 @@ export default function FxCalendar({
                 alignItems: 'center',
                 gap: '8px'
               }}>
-                <span>No scheduled Events</span>
+                <span>No Scheduled Events</span>
               </div>
             ) : (
               <AnimatePresence initial={false}>
