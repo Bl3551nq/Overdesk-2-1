@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import overdeskLogo from './logo.svg';
+import BorderGlow from './components/BorderGlow';
+const overdeskLogo = 'https://raw.githubusercontent.com/Bl3551nq/Overdesk-Logos/refs/heads/main/OVERDESK-fx%20calendar.svg';
 import FxCalendar, { playSynthSound } from './components/FxCalendar';
 
 // Declaration to access global Electron API from preload script
@@ -1391,11 +1392,22 @@ export default function App() {
         overflow: 'visible',
       }}
     >
-      {/* Main checklist canvas card widget */}
-      <div
-        className={`card ${isLight ? 'light' : ''} ${minimized ? 'minimized' : ''} ${isGripped ? 'gripped' : ''} ${!licenseActive ? 'license-mode' : ''}`}
-        id="card"
+      {/* Main checklist canvas card widget with BorderGlow */}
+      <BorderGlow
         ref={cardRef}
+        className={`card-glow-wrapper ${minimized ? 'minimized' : ''} ${isLight ? 'light' : ''}`}
+        edgeSensitivity={30}
+        glowColor={isLight ? "240 50% 70%" : "268 80% 65%"}
+        backgroundColor={isLight ? "rgba(245, 245, 250, 0.98)" : "rgba(3, 5, 20, 0.95)"}
+        borderRadius={36}
+        glowRadius={50}
+        glowIntensity={1.0}
+        coneSpread={25}
+        animated={false}
+        colors={isLight 
+          ? ['#818cf8', '#ca8a04', '#10b981'] 
+          : ['#c084fc', '#f472b6', '#38bdf8']
+        }
         onPointerDown={handleCardPointerDown}
         onPointerMove={handleCardPointerMove}
         onPointerUp={handleCardPointerUp}
@@ -1403,12 +1415,25 @@ export default function App() {
         onDragStart={(e) => e.preventDefault()}
         style={{
           transform: `translate(${translate.x}px, ${translate.y}px) scale(${isGripped ? 1.035 : 1})`,
-          boxShadow: !licenseActive ? 'none' : (isGripped ? `0 18px 50px 5px ${modes[currentMode]?.soft || 'var(--accent-soft)'}, 0 6px 18px rgba(0, 0, 0, 0.45)` : undefined),
           transition: isGripped ? 'transform 0s, box-shadow 0.2s ease' : 'transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, padding 0.35s cubic-bezier(0.4, 0, 0.2, 1), min-height 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
           cursor: isGripped ? 'grabbing' : undefined,
           minHeight: (settingsOpen && !minimized) ? '390px' : undefined,
+          boxShadow: !licenseActive ? 'none' : (isGripped ? `0 18px 50px 5px ${modes[currentMode]?.soft || 'var(--accent-soft)'}, 0 6px 18px rgba(0, 0, 0, 0.45)` : undefined),
         }}
       >
+        <div
+          className={`card ${isLight ? 'light' : ''} ${minimized ? 'minimized' : ''} ${isGripped ? 'gripped' : ''} ${!licenseActive ? 'license-mode' : ''}`}
+          id="card"
+          style={{
+            width: '100%',
+            height: '100%',
+            background: 'transparent',
+            border: 'none',
+            boxShadow: 'none',
+            padding: 0,
+            margin: 0,
+          }}
+        >
         {!licenseActive ? (
           <div className="license-card-inner" style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', boxSizing: 'border-box', padding: '16px 8px' }}>
             <img 
@@ -1418,7 +1443,7 @@ export default function App() {
               style={{ width: '80px', height: '100px', objectFit: 'contain', marginBottom: '16px' }}
               referrerPolicy="no-referrer"
             />
-            <div className="license-title" style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text)' }}>Overdesk Checklist</div>
+            <div className="license-title" style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text)' }}>Overdesk Nexus</div>
             <div className="license-sub" style={{ fontSize: '11px', color: 'var(--text-mid)', textAlign: 'center', lineHeight: '1.4' }}>
               Enter your license key to activate.
               <br />
@@ -1517,79 +1542,6 @@ export default function App() {
                 )}
               </div>
             </div>
-
-            {activeApp === 'calendar' && (
-              <>
-                {/* Cancel/Close Button */}
-                <button
-                  onClick={() => setActiveApp('checklist')}
-                  style={{
-                    background: isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)',
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: '24px',
-                    height: '24px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    color: isLight ? '#1a1a2e' : '#ffffff',
-                    transition: 'all 0.15s ease-in-out',
-                    padding: 0,
-                    margin: 0,
-                  }}
-                  title="Switch back to Checklist"
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'scale(1.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)';
-                  }}
-                >
-                  <svg viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" strokeWidth="3.2" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
-                    <line x1="12" y1="2" x2="12" y2="12"></line>
-                  </svg>
-                </button>
-
-                {/* Settings Gear Button */}
-                <button
-                  onClick={() => setCalendarSettingsOpen(!calendarSettingsOpen)}
-                  style={{
-                    background: calendarSettingsOpen 
-                      ? (isLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.22)') 
-                      : (isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)'),
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: '24px',
-                    height: '24px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    color: calendarSettingsOpen ? '#0082ff' : (isLight ? '#1a1a2e' : '#ffffff'),
-                    transition: 'all 0.15s ease-in-out',
-                    padding: 0,
-                    margin: 0,
-                  }}
-                  title={calendarSettingsOpen ? "Close Simulator Panel" : "Open Simulator & Advanced Settings"}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'scale(1.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)';
-                  }}
-                >
-                  <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" style={{
-                    transform: calendarSettingsOpen ? 'rotate(45deg)' : 'none',
-                    transition: 'transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)'
-                  }}>
-                    <circle cx="12" cy="12" r="3"></circle>
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1-2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                  </svg>
-                </button>
-              </>
-            )}
           </div>
 
           {/* Center Minimize Pill */}
@@ -1610,14 +1562,14 @@ export default function App() {
 
           {/* Right toggle configurations */}
           <div className="top-bar-right">
-            <button className="close-btn" id="close-btn" onClick={triggerAppShutdown} title="Shutdown App">
-              <svg viewBox="0 0 24 24">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
             {activeApp === 'checklist' && (
               <>
+                <button className="close-btn" id="close-btn" onClick={triggerAppShutdown} title="Shutdown App">
+                  <svg viewBox="0 0 24 24">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
                 <button
                   className={`settings-toggle ${settingsOpen ? 'on' : ''}`}
                   id="settings-toggle"
@@ -1658,6 +1610,94 @@ export default function App() {
                       <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                     </svg>
                   )}
+                </button>
+              </>
+            )}
+
+            {activeApp === 'calendar' && (
+              <>
+                {/* Cancel/Shutdown switch-back option */}
+                <button
+                  onClick={() => setActiveApp('checklist')}
+                  style={{
+                    background: isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '30px',
+                    height: '30px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: isLight ? '#1a1a2e' : '#ffffff',
+                    transition: 'all 0.15s ease-in-out',
+                    padding: 0,
+                    margin: 0,
+                  }}
+                  title="Switch back to Checklist"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }}
+                >
+                  <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" strokeWidth="2.8" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                    <line x1="12" y1="2" x2="12" y2="12"></line>
+                  </svg>
+                </button>
+
+                {/* Settings Gear Button */}
+                <button
+                  onClick={() => setCalendarSettingsOpen(!calendarSettingsOpen)}
+                  style={{
+                    background: calendarSettingsOpen 
+                      ? (isLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.22)') 
+                      : (isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)'),
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '30px',
+                    height: '30px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: calendarSettingsOpen ? '#0082ff' : (isLight ? '#1a1a2e' : '#ffffff'),
+                    transition: 'all 0.15s ease-in-out',
+                    padding: 0,
+                    margin: 0,
+                  }}
+                  title={calendarSettingsOpen ? "Close Simulator Panel" : "Open Simulator & Advanced Settings"}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }}
+                >
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{
+                    transform: calendarSettingsOpen ? 'scale(1.08)' : 'none',
+                    transition: 'transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                  }}>
+                    <line x1="4" y1="21" x2="4" y2="14" fill="none"></line>
+                    <line x1="4" y1="10" x2="4" y2="3" fill="none"></line>
+                    <line x1="12" y1="21" x2="12" y2="12" fill="none"></line>
+                    <line x1="12" y1="8" x2="12" y2="3" fill="none"></line>
+                    <line x1="20" y1="21" x2="20" y2="16" fill="none"></line>
+                    <line x1="20" y1="12" x2="20" y2="3" fill="none"></line>
+                    <line x1="2" y1="14" x2="6" y2="14" fill="none"></line>
+                    <line x1="10" y1="8" x2="14" y2="8" fill="none"></line>
+                    <line x1="18" y1="16" x2="22" y2="16" fill="none"></line>
+                  </svg>
+                </button>
+
+                {/* Cancel/Shutdown button (at the far right / 3rd position) */}
+                <button className="close-btn" id="close-btn" onClick={triggerAppShutdown} title="Shutdown App">
+                  <svg viewBox="0 0 24 24">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
                 </button>
               </>
             )}
@@ -1966,9 +2006,6 @@ export default function App() {
             <button
               onClick={() => {
                 setActiveApp((prev) => prev === 'checklist' ? 'calendar' : 'checklist');
-                try {
-                  playSynthSound('desk');
-                } catch (err) {}
               }}
               style={{
                 background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
@@ -2475,11 +2512,14 @@ export default function App() {
             onBackToChecklist={() => setActiveApp('checklist')} 
             settingsPanelOpen={calendarSettingsOpen}
             setSettingsPanelOpen={setCalendarSettingsOpen}
+            minimized={minimized}
+            setMinimized={setMinimized}
           />
         )}
           </>
         )}
-      </div>
+        </div>
+      </BorderGlow>
     </div>
   );
 }

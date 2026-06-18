@@ -552,7 +552,7 @@ body.editing .icon-btn::after {
   transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.card.minimized .fx-container {
+.card.minimized .fx-container:not(.minimized-marquee) {
   max-height: 0 !important;
   opacity: 0 !important;
   pointer-events: none !important;
@@ -1273,10 +1273,67 @@ body.editing .option { cursor: default; }
 .custom-scroll {
   scrollbar-width: none !important; /* Firefox */
   -ms-overflow-style: none !important; /* IE and Edge */
+  pointer-events: auto !important;
+  touch-action: pan-y !important;
 }
 .custom-scroll::-webkit-scrollbar {
   display: none !important; /* Chrome, Safari, Opera */
   width: 0 !important;
   height: 0 !important;
 }
+
+/* ═══════════════════════════════════════════════════════
+   BORDER GLOW INTEGRATION FALLBACK OVERRIDES
+   ═══════════════════════════════════════════════════════ */
+.border-glow-card {
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+  width: 320px !important;
+  box-sizing: border-box !important;
+}
+
+.border-glow-card .card {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  animation: none !important;
+  min-height: auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.border-glow-inner {
+  padding: 14px 20px 14px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   LIVE MARQUEE TICKER STYLING
+   ═══════════════════════════════════════════════════════ */
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee-wrapper {
+  mask-image: linear-gradient(to right, transparent, white 10%, white 90%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, white 10%, white 90%, transparent);
+}
+
+.marquee-content {
+  display: flex;
+  white-space: nowrap;
+  animation: marquee linear infinite;
+  width: max-content;
+}
+
+.marquee-content:hover {
+  animation-play-state: paused;
+}
+
 
