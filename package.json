@@ -1,8 +1,8 @@
 {
-  "name": "overdesk-checklist",
+  "name": "overdesk-nexus",
   "private": true,
   "version": "1.0.0",
-  "description": "Overdesk Checklist - Minimalistic transparent overlay desktop widget checklist.",
+  "description": "Overdesk Nexus - All-in-one transparent desktop dashboard widget.",
   "author": "Overdesk",
   "type": "module",
   "main": "electron/main.cjs",
@@ -16,8 +16,8 @@
     "electron:build": "npm run build && electron-builder --win"
   },
   "build": {
-    "appId": "com.overdesk.checklist",
-    "productName": "Overdesk Checklist",
+    "appId": "com.overdesk.nexus",
+    "productName": "Overdesk Nexus",
     "icon": "electron/icon.png",
     "win": {
       "target": [

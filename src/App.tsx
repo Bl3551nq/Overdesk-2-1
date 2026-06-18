@@ -1439,7 +1439,7 @@ export default function App() {
             <img 
               className="license-logo" 
               src={overdeskLogo} 
-              alt="Overdesk Checklist Logo" 
+              alt="Overdesk Nexus Logo" 
               style={{ width: '80px', height: '100px', objectFit: 'contain', marginBottom: '16px' }}
               referrerPolicy="no-referrer"
             />

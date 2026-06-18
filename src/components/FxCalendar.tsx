@@ -525,73 +525,89 @@ export default function FxCalendar({
   const [syncStatus, setSyncStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [syncError, setSyncError] = useState<string>('');
 
-  const fetchRemoteEvents = async (url: string) => {
-    if (!url || !url.trim()) {
-      setEventsSource(FX_EVENTS);
-      setSyncStatus('idle');
-      return;
+  const fetchRemoteEvents = async (explicitUrl?: string) => {
+    // Generate the candidates based on user's username Bl3551nq and repos
+    const urlsToTry: string[] = [];
+    if (explicitUrl && explicitUrl.trim() !== "") {
+      urlsToTry.push(explicitUrl.trim());
+    } else if (REMOTE_JSON_URL && REMOTE_JSON_URL.trim() !== "") {
+      urlsToTry.push(REMOTE_JSON_URL.trim());
+    } else {
+      urlsToTry.push(
+        "/src/ff_data.json",
+        "/ff_data.json",
+        "https://raw.githubusercontent.com/Bl3551nq/overdesk-checklist/main/src/ff_data.json",
+        "https://raw.githubusercontent.com/Bl3551nq/overdesk-nexus/main/src/ff_data.json",
+        "https://raw.githubusercontent.com/Bl3551nq/overdesk-checklist/main/ff_data.json",
+        "https://raw.githubusercontent.com/Bl3551nq/overdesk-nexus/main/ff_data.json"
+      );
     }
+
     setSyncStatus('loading');
     setSyncError('');
-    try {
-      let targetUrl = url.trim();
-      // Handle standard GitHub repo URLs to point directly to raw.githubusercontent.com
+
+    for (let i = 0; i < urlsToTry.length; i++) {
+      let targetUrl = urlsToTry[i];
+      // Convert standard github web links to Raw CDN paths
       if (targetUrl.includes('github.com') && !targetUrl.includes('raw.githubusercontent.com') && !targetUrl.includes('/raw/')) {
         targetUrl = targetUrl
           .replace('github.com', 'raw.githubusercontent.com')
           .replace('/blob/', '/');
       }
 
-      const res = await fetch(targetUrl);
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
-      const data = await res.json();
-      if (!Array.isArray(data)) {
-        throw new Error("JSON data must be an array of event objects.");
-      }
-      
-      const validated: FxEvent[] = data.map((item: any, idx: number) => {
-        let impactVal: "Low" | "Medium" | "High" | "Holiday" | "Non-Econ" = 'Low';
-        const rawImpact = String(item.impact || '').toLowerCase();
-        if (rawImpact.includes('high')) impactVal = 'High';
-        else if (rawImpact.includes('med')) impactVal = 'Medium';
-        else if (rawImpact.includes('low')) impactVal = 'Low';
-        else if (rawImpact.includes('hol')) impactVal = 'Holiday';
-        else if (rawImpact.includes('non')) impactVal = 'Non-Econ';
+      try {
+        console.log(`Live remote loader trying: ${targetUrl}`);
+        const res = await fetch(targetUrl);
+        if (!res.ok) {
+          throw new Error(`HTTP error ${res.status}`);
+        }
+        const data = await res.json();
+        if (!Array.isArray(data)) {
+          throw new Error("JSON is not a list array");
+        }
 
-        return {
-          country: String(item.country || 'USD'),
-          date: String(item.date || new Date().toISOString()),
-          title: String(item.title || `Event #${idx}`),
-          impact: impactVal,
-          actual: item.actual !== undefined ? String(item.actual) : null,
-          forecast: item.forecast !== undefined ? String(item.forecast) : null,
-          previous: item.previous !== undefined ? String(item.previous) : null,
-        };
-      });
+        const validated: FxEvent[] = data.map((item: any, idx: number) => {
+          let impactVal: "Low" | "Medium" | "High" | "Holiday" | "Non-Econ" = 'Low';
+          const rawImpact = String(item.impact || '').toLowerCase();
+          if (rawImpact.includes('high')) impactVal = 'High';
+          else if (rawImpact.includes('med')) impactVal = 'Medium';
+          else if (rawImpact.includes('low')) impactVal = 'Low';
+          else if (rawImpact.includes('hol')) impactVal = 'Holiday';
+          else if (rawImpact.includes('non')) impactVal = 'Non-Econ';
 
-      if (validated.length === 0) {
-        throw new Error("Events array is empty.");
+          return {
+            country: String(item.country || 'USD'),
+            date: String(item.date || new Date().toISOString()),
+            title: String(item.title || `Event #${idx}`),
+            impact: impactVal,
+            actual: item.actual !== undefined ? String(item.actual) : null,
+            forecast: item.forecast !== undefined ? String(item.forecast) : null,
+            previous: item.previous !== undefined ? String(item.previous) : null,
+          };
+        });
+
+        if (validated.length === 0) {
+          throw new Error("Events list array is empty");
+        }
+
+        setEventsSource(validated);
+        setSyncStatus('success');
+        console.log(`Successfully synced live news! Loaded ${validated.length} events from ${targetUrl}`);
+        return; // Success, exit function
+      } catch (err: any) {
+        console.warn(`Candidate path [${targetUrl}] failed:`, err.message || err);
+        // If it was the last candidate, report sync error and fall back
+        if (i === urlsToTry.length - 1) {
+          setSyncStatus('error');
+          setSyncError(err.message || 'Failed to match clean online source');
+          setEventsSource(FX_EVENTS);
+        }
       }
-
-      setEventsSource(validated);
-      setSyncStatus('success');
-    } catch (err: any) {
-      console.error("Live Remote Sync Error:", err);
-      setSyncStatus('error');
-      setSyncError(err.message || 'Failed to fetch data.');
-      // Gratefully fallback to local static data
-      setEventsSource(FX_EVENTS);
     }
   };
 
   useEffect(() => {
-    if (REMOTE_JSON_URL && REMOTE_JSON_URL.trim() !== "") {
-      fetchRemoteEvents(REMOTE_JSON_URL);
-    } else {
-      setEventsSource(FX_EVENTS);
-    }
+    fetchRemoteEvents();
   }, []);
 
   const getElapsedWeeks = () => {
