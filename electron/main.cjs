@@ -201,7 +201,7 @@ function createTray() {
     }
   ]);
 
-  tray.setToolTip('Overdesk Checklist');
+  tray.setToolTip('Overdesk Nexus');
   tray.setContextMenu(contextMenu);
 
   tray.on('click', () => {
