@@ -17,8 +17,33 @@ import SideRays from './SideRays';
 // ============================================================================
 export const REMOTE_JSON_URL: string = "";
 
+// Define remote custom high-fidelity MP3 chimes hosted on GitHub raw CDN
+const REMOTE_AUDIO_URLS: Record<string, string> = {
+  school: "https://raw.githubusercontent.com/Bl3551nq/bell-sound/main/school_bell.mp3",
+  princess: "https://raw.githubusercontent.com/Bl3551nq/bell-sound/main/princess_bell.mp3",
+  pokemon: "https://raw.githubusercontent.com/Bl3551nq/bell-sound/main/pokemon_colo_heal.mp3",
+};
+
 // Define the synthesizer chime trigger
 export const playSynthSound = (profile: string) => {
+  // Try high-fidelity raw MP3 audio play from GitHub first
+  if (REMOTE_AUDIO_URLS[profile]) {
+    const audio = new Audio(REMOTE_AUDIO_URLS[profile]);
+    audio.volume = 0.5;
+    audio.play()
+      .then(() => {
+        console.log(`Successfully played high-fidelity remote sound [${profile}]`);
+      })
+      .catch((err) => {
+        console.warn(`Web audio file playback failed, falling back to synthesized chime:`, err);
+        playFallbackSynth(profile);
+      });
+  } else {
+    playFallbackSynth(profile);
+  }
+};
+
+const playFallbackSynth = (profile: string) => {
   const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
   if (!AudioContextClass) return;
   const ctx = new AudioContextClass();
@@ -481,6 +506,9 @@ export default function FxCalendar({
   // Track active alerts for user feedback
   const [activeAlertText, setActiveAlertText] = useState<string | null>(null);
 
+  // Sound dropdown menu toggle
+  const [soundDropdownOpen, setSoundDropdownOpen] = useState(false);
+
   // Centralized Reset All function to restore all initial states, including active filters, muted/alarm settings, and dismissed events
   const handleResetAll = () => {
     setActiveImpacts(['High', 'Medium', 'Low', 'Holiday', 'Non-Econ']);
@@ -631,6 +659,27 @@ export default function FxCalendar({
     return list;
   };
 
+  const shiftIsoDateString = (isoStr: string, daysToShift: number) => {
+    try {
+      const parts = isoStr.split('T');
+      if (parts.length < 2) return isoStr;
+      const datePart = parts[0]; 
+      const timePart = parts[1]; 
+      
+      const [y, m, d] = datePart.split('-').map(Number);
+      const tempDate = new Date(Date.UTC(y, m - 1, d));
+      tempDate.setUTCDate(tempDate.getUTCDate() + daysToShift);
+      
+      const newY = tempDate.getUTCFullYear();
+      const newM = String(tempDate.getUTCMonth() + 1).padStart(2, '0');
+      const newD = String(tempDate.getUTCDate()).padStart(2, '0');
+      
+      return `${newY}-${newM}-${newD}T${timePart}`;
+    } catch (_) {
+      return isoStr;
+    }
+  };
+
   const getDynamicEvents = () => {
     const baseDate = new Date('2026-06-14T00:00:00Z');
     const elapsedWeeks = getElapsedWeeks();
@@ -645,13 +694,16 @@ export default function FxCalendar({
       const date1 = new Date(windowStartMs + offsetInCycle);
       const date2 = new Date(windowStartMs + offsetInCycle + cycleMs);
       
+      const daysDiff1 = Math.round((date1.getTime() - eDate.getTime()) / (24 * 60 * 60 * 1000));
+      const daysDiff2 = Math.round((date2.getTime() - eDate.getTime()) / (24 * 60 * 60 * 1000));
+
       list.push({
         ...e,
-        date: date1.toISOString().replace('.000Z', '+01:00'),
+        date: shiftIsoDateString(e.date, daysDiff1),
       });
       list.push({
         ...e,
-        date: date2.toISOString().replace('.000Z', '+01:00'),
+        date: shiftIsoDateString(e.date, daysDiff2),
       });
     });
     return list;
@@ -1070,7 +1122,8 @@ export default function FxCalendar({
             padding: '1px 4px', 
             borderRadius: '4px', 
             background: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.08)', 
-            color: isLight ? '#64748b' : '#94a3b8',
+            color: getImpactColor(e.impact),
+            fontWeight: 700,
             fontFamily: 'var(--font-mono)',
             flexShrink: 0
           }}>
@@ -1382,10 +1435,8 @@ export default function FxCalendar({
                             <span style={{
                               fontFamily: 'var(--font-mono), monospace',
                               fontSize: '10px',
-                              fontWeight: 700,
-                              color: isLight 
-                                ? 'rgba(15, 23, 42, 0.75)' 
-                                : (isEventActiveHour ? '#3b82f6' : 'rgba(255, 255, 255, 0.8)'),
+                              fontWeight: 800,
+                              color: getImpactColor(e.impact),
                               letterSpacing: '-0.02em',
                               lineHeight: '1.2'
                             }}>
@@ -1394,13 +1445,11 @@ export default function FxCalendar({
                             {formatTime(e.date).includes(' ') && (
                               <span style={{
                                 fontSize: '8px',
-                                fontWeight: 700,
-                                opacity: isEventActiveHour && !isLight ? 1 : 0.6,
-                                color: isLight 
-                                  ? '#475569' 
-                                  : (isEventActiveHour ? '#3b82f6' : '#94a3b8'),
+                                fontWeight: 800,
+                                color: getImpactColor(e.impact),
                                 textTransform: 'uppercase',
-                                marginTop: '1px'
+                                marginTop: '1px',
+                                opacity: 0.9
                               }}>
                                 {formatTime(e.date).split(' ')[1]}
                               </span>
@@ -1988,89 +2037,197 @@ export default function FxCalendar({
                       justifyContent: 'center',
                       boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
                     }}>
-                      <span style={{ fontSize: '10px' }}>⏰</span>
+                      <span style={{ fontSize: '10px' }}>🔔</span>
                     </div>
                   </button>
                 </div>
 
-                {/* Sound Carousel */}
-                <div style={{
-                  background: isLight ? '#e2e8f0' : 'transparent',
-                  border: isLight ? '1px solid #cbd5e1' : 'none',
-                  borderRadius: '10px',
-                  padding: isLight ? '6px 10px' : '6px 0px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}>
-                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                    <button
-                      onClick={() => {
-                        const profiles = [
-                          { id: 'school', name: 'School Bell' },
-                          { id: 'desk', name: 'Desk Bell' },
-                          { id: 'pokemon', name: 'Pokémon Heal' },
-                          { id: 'princess', name: 'Princess Bell' },
-                        ];
-                        const idx = profiles.findIndex(p => p.id === soundProfile);
-                        const prevIdx = (idx - 1 + profiles.length) % profiles.length;
-                        setSoundProfile(profiles[prevIdx].id);
-                      }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#6366f1' }}
-                    >
-                      <ChevronLeft size={16} />
-                    </button>
-                    
-                    <span style={{ fontSize: '11px', fontWeight: '700', color: isLight ? '#1e293b' : '#f8fafc', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      {soundProfile === 'school' ? '🔔 School Bell' :
-                       soundProfile === 'pokemon' ? '🎒 Pokémon Heal' :
-                       soundProfile === 'princess' ? '👸 Princess Bell' : '🔔 Desk Bell'}
-                    </span>
+                {/* Sound Carousel (Aesthetic Layout Matching User's Screenshot) */}
+                <div style={{ position: 'relative' }}>
+                  <div style={{
+                    background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.02)',
+                    border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.06)',
+                    borderRadius: '12px',
+                    padding: '8px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    transition: 'all 0.2s ease',
+                  }}>
+                    {/* Left Carousel control: < [🔔 School Bell] > */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button
+                        onClick={() => {
+                          const profiles = [
+                            { id: 'school', name: 'School Bell' },
+                            { id: 'desk', name: 'Desk Bell' },
+                            { id: 'pokemon', name: 'Pokémon Heal' },
+                            { id: 'princess', name: 'Princess Bell' },
+                          ];
+                          const idx = profiles.findIndex(p => p.id === soundProfile);
+                          const prevIdx = (idx - 1 + profiles.length) % profiles.length;
+                          setSoundProfile(profiles[prevIdx].id);
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#6366f1',
+                          opacity: 0.8,
+                          transition: 'opacity 0.2s',
+                        }}
+                        className="hover:opacity-100"
+                      >
+                        <ChevronLeft size={16} strokeWidth={2.5} />
+                      </button>
+                      
+                      <div 
+                        onClick={() => setSoundDropdownOpen(!soundDropdownOpen)}
+                        style={{
+                          fontSize: '12.5px',
+                          fontWeight: '700',
+                          color: isLight ? '#0f172a' : '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                        }}
+                        className="hover:text-indigo-400 transition-colors"
+                        title="Click to view all sound options"
+                      >
+                        <span style={{ fontSize: '13px' }}>🔔</span>
+                        <span>
+                          {soundProfile === 'school' ? 'School Bell' :
+                           soundProfile === 'pokemon' ? 'Pokémon Heal' :
+                           soundProfile === 'princess' ? 'Princess Bell' : 'Desk Bell'}
+                        </span>
+                      </div>
 
-                    <button
-                      onClick={() => {
-                        const profiles = [
-                          { id: 'school', name: 'School Bell' },
-                          { id: 'desk', name: 'Desk Bell' },
-                          { id: 'pokemon', name: 'Pokémon Heal' },
-                          { id: 'princess', name: 'Princess Bell' },
-                        ];
-                        const idx = profiles.findIndex(p => p.id === soundProfile);
-                        const nextIdx = (idx + 1) % profiles.length;
-                        setSoundProfile(profiles[nextIdx].id);
-                      }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#6366f1' }}
-                    >
-                      <ChevronRight size={16} />
-                    </button>
+                      <button
+                        onClick={() => {
+                          const profiles = [
+                            { id: 'school', name: 'School Bell' },
+                            { id: 'desk', name: 'Desk Bell' },
+                            { id: 'pokemon', name: 'Pokémon Heal' },
+                            { id: 'princess', name: 'Princess Bell' },
+                          ];
+                          const idx = profiles.findIndex(p => p.id === soundProfile);
+                          const nextIdx = (idx + 1) % profiles.length;
+                          setSoundProfile(profiles[nextIdx].id);
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#6366f1',
+                          opacity: 0.8,
+                          transition: 'opacity 0.2s',
+                        }}
+                        className="hover:opacity-100"
+                      >
+                        <ChevronRight size={16} strokeWidth={2.5} />
+                      </button>
+                    </div>
+
+                    {/* Right Play trigger: (▶) */}
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                      <button
+                        onClick={() => {
+                          try {
+                            playSynthSound(soundProfile);
+                          } catch (_) {}
+                        }}
+                        style={{
+                          background: '#6366f1',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '28px',
+                          height: '28px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          transition: 'transform 0.15s, background 0.15s',
+                        }}
+                        className="hover:scale-105 active:scale-95 hover:bg-indigo-600"
+                        title={`Play preview of ${soundProfile} sound`}
+                      >
+                        <Play size={11} fill="currentColor" style={{ marginLeft: '2px' }} />
+                      </button>
+                    </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <button
-                      onClick={() => {
-                        try {
-                          playSynthSound(soundProfile);
-                        } catch (_) {}
-                      }}
-                      style={{
-                        background: '#6366f1',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '50%',
-                        width: '22px',
-                        height: '22px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        transition: 'opacity 0.2s'
-                      }}
-                      className="hover:opacity-90"
-                    >
-                      <Play size={10} fill="currentColor" style={{ marginLeft: '1px' }} />
-                    </button>
-                    <ChevronDown size={14} style={{ opacity: 0.6 }} />
-                  </div>
+                  {/* Dropdown Options Popup */}
+                  {soundDropdownOpen && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '100%',
+                      left: '0',
+                      right: '0',
+                      marginBottom: '6px',
+                      background: isLight ? '#ffffff' : '#1e293b',
+                      border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '10px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.35)',
+                      zIndex: 100,
+                      padding: '4px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '2px',
+                    }}>
+                      {[
+                        { id: 'school', name: 'School Bell' },
+                        { id: 'desk', name: 'Desk Bell' },
+                        { id: 'pokemon', name: 'Pokémon Heal' },
+                        { id: 'princess', name: 'Princess Bell' },
+                      ].map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => {
+                            setSoundProfile(p.id);
+                            setSoundDropdownOpen(false);
+                            // Auto-trigger sound selection preview instantly
+                            setTimeout(() => {
+                              try { playSynthSound(p.id); } catch (_) {}
+                            }, 120);
+                          }}
+                          style={{
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            border: 'none',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            background: soundProfile === p.id 
+                              ? (isLight ? '#e0e7ff' : 'rgba(99, 102, 241, 0.25)') 
+                              : 'transparent',
+                            color: soundProfile === p.id 
+                              ? (isLight ? '#4338ca' : '#c7d2fe') 
+                              : (isLight ? '#334155' : '#cbd5e1'),
+                          }}
+                          className={`${soundProfile === p.id ? '' : 'hover:bg-slate-700/20'}`}
+                        >
+                          <span style={{ fontSize: '11px' }}>🔔</span>
+                          <span>{p.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

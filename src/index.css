@@ -570,6 +570,8 @@ body.editing .icon-btn::after {
   height: 176px;
   flex-shrink: 0;
   scrollbar-width: none;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
 }
 .scroll-area::-webkit-scrollbar {
   width: 4px;
@@ -1275,6 +1277,8 @@ body.editing .option { cursor: default; }
   -ms-overflow-style: none !important; /* IE and Edge */
   pointer-events: auto !important;
   touch-action: pan-y !important;
+  scroll-behavior: smooth !important;
+  -webkit-overflow-scrolling: touch !important;
 }
 .custom-scroll::-webkit-scrollbar {
   display: none !important; /* Chrome, Safari, Opera */
