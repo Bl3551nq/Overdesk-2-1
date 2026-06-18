@@ -59,8 +59,13 @@ body.electron .theme-switch, body.electron .minimize-pill, body.electron .minimi
 body.electron .resize-handle, body.electron .reset-wrap, body.electron .color-swatch, 
 body.electron .color-custom-wrap, body.electron .title-wrap, body.electron .title, 
 body.electron .title-container-editable, body.electron .edit-title-btn,
-body.electron .title-input, body.electron .mode-label, body.electron a, body.electron select, body.electron .picker-grid {
+body.electron .title-input, body.electron .mode-label, body.electron a, body.electron select, body.electron .picker-grid,
+body.electron .no-drag, body.electron .scroll-area, body.electron .custom-scroll {
   -webkit-app-region: no-drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag !important;
 }
 
 /* ═══════════════════════════════════════════════════════

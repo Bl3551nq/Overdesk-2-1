@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
@@ -16,6 +16,8 @@ let programmaticTimeout = null;
 let isScaling = false;
 let scaleCenterX = null;
 let scaleCenterY = null;
+let lastTargetW = null;
+let lastTargetH = null;
 const configPath = path.join(app.getPath('userData'), 'app-config.json');
 
 // Helper to read config
@@ -61,6 +63,9 @@ function createWindow() {
   // Custom sizing math fitting our card size (320px width initially)
   const initialWidth = Math.round((320 + 140) * savedScale);
   const initialHeight = Math.round((480 + 200) * savedScale);
+
+  lastTargetW = initialWidth;
+  lastTargetH = initialHeight;
 
   const windowOptions = {
     width: initialWidth,
@@ -128,6 +133,21 @@ function createWindow() {
         writeConfig({ x, y });
       }
     }, 300);
+  });
+
+  // Handle OS/Screen sleep/wake-initiated window crushing or display change resizing
+  mainWindow.on('resize', () => {
+    if (isProgrammaticBoundsUpdate || isScaling) return;
+    if (mainWindow && lastTargetW && lastTargetH) {
+      const [w, h] = mainWindow.getSize();
+      if (w !== lastTargetW || h !== lastTargetH) {
+        isProgrammaticBoundsUpdate = true;
+        mainWindow.setSize(lastTargetW, lastTargetH);
+        setTimeout(() => {
+          isProgrammaticBoundsUpdate = false;
+        }, 300);
+      }
+    }
   });
 
   mainWindow.on('close', (event) => {
@@ -252,6 +272,49 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
+    }
+  });
+
+  // Handle display changes (e.g. monitors unplugged/replugged or screen resolution/DPI transitions)
+  screen.on('display-metrics-changed', () => {
+    if (mainWindow && lastTargetW && lastTargetH) {
+      isProgrammaticBoundsUpdate = true;
+      mainWindow.setSize(lastTargetW, lastTargetH);
+      const config = readConfig();
+      if (typeof config.x === 'number' && typeof config.y === 'number') {
+        mainWindow.setPosition(config.x, config.y);
+      }
+      setTimeout(() => {
+        isProgrammaticBoundsUpdate = false;
+      }, 500);
+    }
+  });
+
+  screen.on('display-removed', () => {
+    if (mainWindow && lastTargetW && lastTargetH) {
+      isProgrammaticBoundsUpdate = true;
+      mainWindow.setSize(lastTargetW, lastTargetH);
+      const config = readConfig();
+      if (typeof config.x === 'number' && typeof config.y === 'number') {
+        mainWindow.setPosition(config.x, config.y);
+      }
+      setTimeout(() => {
+        isProgrammaticBoundsUpdate = false;
+      }, 500);
+    }
+  });
+
+  screen.on('display-added', () => {
+    if (mainWindow && lastTargetW && lastTargetH) {
+      isProgrammaticBoundsUpdate = true;
+      mainWindow.setSize(lastTargetW, lastTargetH);
+      const config = readConfig();
+      if (typeof config.x === 'number' && typeof config.y === 'number') {
+        mainWindow.setPosition(config.x, config.y);
+      }
+      setTimeout(() => {
+        isProgrammaticBoundsUpdate = false;
+      }, 500);
     }
   });
 });
@@ -421,6 +484,7 @@ ipcMain.on('set-height', (event, height) => {
     const config = readConfig();
     const scale = config.scale || 1.0;
     const newHeight = Math.round((height + 200) * scale);
+    lastTargetH = newHeight;
     mainWindow.setSize(w, newHeight);
   }
 });
@@ -434,6 +498,10 @@ ipcMain.on('card-bounds', (event, bounds) => {
     // Resize Electron window to leave ample transparent padding so the card's deep blurred drop shadow doesn't get clipped
     const targetW = Math.max(100, Math.round((bounds.w + 140) * activeScale));
     const targetH = Math.max(50, Math.round((bounds.h + 200) * activeScale));
+    
+    // Store latest target size programmatically
+    lastTargetW = targetW;
+    lastTargetH = targetH;
     
     // Fetch current position and size
     const [currentX, currentY] = mainWindow.getPosition();
