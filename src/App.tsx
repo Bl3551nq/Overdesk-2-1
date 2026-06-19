@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import BorderGlow from './components/BorderGlow';
-const overdeskLogo = 'https://raw.githubusercontent.com/Bl3551nq/Overdesk-Logos/refs/heads/main/Overdesk%20Nexus.svg';
+const overdeskLogo = 'https://raw.githubusercontent.com/Bl3551nq/Overdesk-Logos/refs/heads/main/OVERDESK-fx%20calendar.svg';
 import FxCalendar, { playSynthSound } from './components/FxCalendar';
 
 // Declaration to access global Electron API from preload script
@@ -958,12 +958,13 @@ export default function App() {
         img.src = overdeskLogo;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          canvas.width = 256;
-          canvas.height = 256;
+          canvas.width = 48;
+          canvas.height = 48;
           const ctx = canvas.getContext('2d');
           if (ctx) {
-            ctx.clearRect(0, 0, 256, 256);
-            ctx.drawImage(img, 0, 0, 256, 256);
+            ctx.clearRect(0, 0, 48, 48);
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(img, 0, 0, 48, 48);
             const dataUrl = canvas.toDataURL('image/png');
             (window as any).electronAPI.saveIcon(dataUrl);
           }
@@ -1386,7 +1387,7 @@ export default function App() {
         display: 'flex',
         alignItems: 'flex-start',
         justifyContent: 'center',
-        paddingTop: '100px',
+        paddingTop: '0px',
         background: 'transparent',
         position: 'relative',
         overflow: 'visible',
@@ -1593,9 +1594,12 @@ export default function App() {
                     e.currentTarget.style.transform = 'scale(1)';
                   }}
                 >
-                  <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" strokeWidth="2.8" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
-                    <line x1="12" y1="2" x2="12" y2="12"></line>
+                  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2.0" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                    {/* Portal bracket on left */}
+                    <path d="M12 6H8a5 5 0 0 0-5 5v2a5 5 0 0 0 5 5h4" />
+                    {/* Transit arrow pointing right */}
+                    <line x1="7" y1="12" x2="21" y2="12" />
+                    <polyline points="16 7 21 12 16 17" />
                   </svg>
                 </button>
 
@@ -1664,9 +1668,12 @@ export default function App() {
                     e.currentTarget.style.transform = 'scale(1)';
                   }}
                 >
-                  <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" strokeWidth="2.8" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
-                    <line x1="12" y1="2" x2="12" y2="12"></line>
+                  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2.0" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                    {/* Portal bracket on right */}
+                    <path d="M12 6h4a5 5 0 0 1 5 5v2a5 5 0 0 1-5 5h-4" />
+                    {/* Transit arrow pointing left */}
+                    <line x1="17" y1="12" x2="3" y2="12" />
+                    <polyline points="8 7 3 12 8 17" />
                   </svg>
                 </button>
 
