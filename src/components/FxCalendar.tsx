@@ -17,6 +17,52 @@ import SideRays from './SideRays';
 // ============================================================================
 export const REMOTE_JSON_URL: string = "";
 
+// Unified, high-fidelity Sanitizer to avoid any corrupted data, case-mismatches, or ancient years (like 1930)
+export const sanitizeEvents = (raw: any[]): FxEvent[] => {
+  if (!Array.isArray(raw)) return [];
+  
+  return raw
+    .map((item: any, idx: number) => {
+      try {
+        if (!item) return null;
+        
+        let dateStr = String(item.date || '').trim();
+        // Replace colons in YYYY:MM:DD formatted strings if present
+        if (dateStr.includes(':') && !dateStr.includes('-') && (dateStr.indexOf(':') < dateStr.indexOf('T') || !dateStr.includes('T'))) {
+          const parts = dateStr.split(':');
+          if (parts[0] && parts[0].length === 4 && parts[1] && parts[1].length === 2 && parts[2] && parts[2].length === 2) {
+            dateStr = `${parts[0]}-${parts[1]}-${parts[2]}` + (parts.slice(3).length > 0 ? 'T' + parts.slice(3).join(':') : '');
+          }
+        }
+
+        const dObj = new Date(dateStr);
+        if (isNaN(dObj.getTime())) return null;
+        if (dObj.getFullYear() < 2000) return null; // Safely discard corrupt ancient dates/years
+
+        let impactVal: "Low" | "Medium" | "High" | "Holiday" | "Non-Econ" = 'Low';
+        const rawImpact = String(item.impact || '').toLowerCase();
+        if (rawImpact.includes('high')) impactVal = 'High';
+        else if (rawImpact.includes('med') || rawImpact.includes('mid')) impactVal = 'Medium';
+        else if (rawImpact.includes('low')) impactVal = 'Low';
+        else if (rawImpact.includes('hol')) impactVal = 'Holiday';
+        else if (rawImpact.includes('non')) impactVal = 'Non-Econ';
+
+        return {
+          country: String(item.country || 'USD').trim().toUpperCase(),
+          date: dateStr,
+          title: String(item.title || `Event #${idx}`).trim(),
+          impact: impactVal,
+          actual: item.actual !== undefined && item.actual !== null && String(item.actual).trim() !== "" ? String(item.actual).trim() : null,
+          forecast: item.forecast !== undefined && item.forecast !== null && String(item.forecast).trim() !== "" ? String(item.forecast).trim() : null,
+          previous: item.previous !== undefined && item.previous !== null && String(item.previous).trim() !== "" ? String(item.previous).trim() : null,
+        } as FxEvent;
+      } catch (_) {
+        return null;
+      }
+    })
+    .filter((e): e is FxEvent => e !== null);
+};
+
 // Define remote custom high-fidelity MP3 chimes hosted on GitHub raw CDN
 const REMOTE_AUDIO_URLS: Record<string, string> = {
   school: "https://raw.githubusercontent.com/Bl3551nq/bell-sound/main/school_bell.mp3",
@@ -506,6 +552,10 @@ export default function FxCalendar({
     return '2026-06-19';
   });
 
+  // State variables for the interactive Month/Day quick-selector calendar picker
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState<boolean>(false);
+  const [pickerMonth, setPickerMonth] = useState<number>(5); // Default to June (month 5 in UTC)
+
   // Toggle Advanced Settings Drawer
   const [localSettingsPanelOpen, localSetSettingsPanelOpen] = useState<boolean>(false);
   const settingsPanelOpen = externalSettingsPanelOpen !== undefined ? externalSettingsPanelOpen : localSettingsPanelOpen;
@@ -560,7 +610,7 @@ export default function FxCalendar({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // --- Remote live JSON data sync setup ---
-  const [eventsSource, setEventsSource] = useState<FxEvent[]>(FX_EVENTS);
+  const [eventsSource, setEventsSource] = useState<FxEvent[]>(() => sanitizeEvents(FX_EVENTS));
   const [syncStatus, setSyncStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [syncError, setSyncError] = useState<string>('');
 
@@ -607,25 +657,7 @@ export default function FxCalendar({
           throw new Error("JSON is not a list array");
         }
 
-        const validated: FxEvent[] = data.map((item: any, idx: number) => {
-          let impactVal: "Low" | "Medium" | "High" | "Holiday" | "Non-Econ" = 'Low';
-          const rawImpact = String(item.impact || '').toLowerCase();
-          if (rawImpact.includes('high')) impactVal = 'High';
-          else if (rawImpact.includes('med')) impactVal = 'Medium';
-          else if (rawImpact.includes('low')) impactVal = 'Low';
-          else if (rawImpact.includes('hol')) impactVal = 'Holiday';
-          else if (rawImpact.includes('non')) impactVal = 'Non-Econ';
-
-          return {
-            country: String(item.country || 'USD'),
-            date: String(item.date || new Date().toISOString()),
-            title: String(item.title || `Event #${idx}`),
-            impact: impactVal,
-            actual: item.actual !== undefined ? String(item.actual) : null,
-            forecast: item.forecast !== undefined ? String(item.forecast) : null,
-            previous: item.previous !== undefined ? String(item.previous) : null,
-          };
-        });
+        const validated = sanitizeEvents(data);
 
         if (validated.length === 0) {
           throw new Error("Events list array is empty");
@@ -641,7 +673,7 @@ export default function FxCalendar({
         if (i === urlsToTry.length - 1) {
           setSyncStatus('error');
           setSyncError(err.message || 'Failed to match clean online source');
-          setEventsSource(FX_EVENTS);
+          setEventsSource(sanitizeEvents(FX_EVENTS));
         }
       }
     }
@@ -664,40 +696,80 @@ export default function FxCalendar({
   const getDayList = () => {
     const list: string[] = [];
     
-    // Support past events accessible up to 3 months (90 days) prior to appLaunchRealDate
-    const start = new Date(appLaunchRealDate.getTime() - 90 * 24 * 60 * 60 * 1000);
+    // Default base limits
+    let minDate = new Date(appLaunchRealDate.getTime() - 90 * 24 * 60 * 60 * 1000);
+    let maxDate = new Date('2026-12-17T23:59:59'); // Keep showing through Dec 17th
     
-    // Always go at least 30 days into the future relative to appLaunchRealDate, or up to the maximum event date
-    let maxFutureMs = appLaunchRealDate.getTime() + 30 * 24 * 60 * 60 * 1000;
+    // Scan all events dynamically to determine wider limits if present (ignoring corrupted entries)
     if (eventsSource && eventsSource.length > 0) {
       eventsSource.forEach(e => {
         try {
-          const t = new Date(e.date).getTime();
-          if (!isNaN(t) && t > maxFutureMs) {
-            maxFutureMs = t;
+          const dStr = String(e.date || '').substring(0, 10);
+          if (dStr && dStr.length === 10) {
+            const dObj = new Date(dStr);
+            if (!isNaN(dObj.getTime()) && dObj.getFullYear() >= 2000) {
+              if (dObj < minDate) {
+                minDate = dObj;
+              }
+              if (dObj > maxDate) {
+                maxDate = dObj;
+              }
+            }
           }
         } catch (_) {}
       });
     }
-    const end = new Date(maxFutureMs);
+
+    const current = new Date(Date.UTC(minDate.getUTCFullYear(), minDate.getUTCMonth(), minDate.getUTCDate(), 12, 0, 0));
+    const target = new Date(Date.UTC(maxDate.getUTCFullYear(), maxDate.getUTCMonth(), maxDate.getUTCDate(), 12, 0, 0));
     
-    // Calculate precise range difference in days to build the list
-    const diffMs = end.getTime() - start.getTime();
-    const totalDays = Math.max(30, Math.ceil(diffMs / (24 * 60 * 60 * 1000))) + 2; // small safety padding
-    
-    const baseWalk = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 12, 0, 0);
-    for (let i = 0; i < totalDays; i++) {
-      const d = new Date(baseWalk.getTime() + i * 24 * 60 * 60 * 1000);
-      if (d.getTime() > end.getTime() + 24 * 60 * 60 * 1000) {
-        break;
-      }
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
+    // Safety check to avoid infinite loops
+    let safetyCounter = 0;
+    while (current <= target && safetyCounter < 1500) {
+      const yyyy = current.getUTCFullYear();
+      const mm = String(current.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(current.getUTCDate()).padStart(2, '0');
       list.push(`${yyyy}-${mm}-${dd}`);
+      
+      current.setUTCDate(current.getUTCDate() + 1);
+      safetyCounter++;
     }
     return list;
   };
+
+  const getDaysInMonthGrid = (year: number, month: number) => {
+    const firstDay = new Date(Date.UTC(year, month, 1));
+    const firstDayOfWeek = firstDay.getUTCDay(); // 0 = Sunday
+    const totalDays = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    
+    const grid: (string | null)[] = [];
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      grid.push(null);
+    }
+    for (let day = 1; day <= totalDays; day++) {
+      const mm = String(month + 1).padStart(2, '0');
+      const dd = String(day).padStart(2, '0');
+      grid.push(`${year}-${mm}-${dd}`);
+    }
+    return grid;
+  };
+
+  const getEventsCountMap = () => {
+    const map: Record<string, number> = {};
+    if (eventsSource && eventsSource.length > 0) {
+      eventsSource.forEach(e => {
+        try {
+          const dateString = String(e.date || '').substring(0, 10);
+          if (dateString) {
+            map[dateString] = (map[dateString] || 0) + 1;
+          }
+        } catch (_) {}
+      });
+    }
+    return map;
+  };
+
+  const eventsCountMap = getEventsCountMap();
 
   const shiftIsoDateString = (isoStr: string, daysToShift: number) => {
     try {
@@ -739,7 +811,7 @@ export default function FxCalendar({
         setSelectedDayString(list[0]);
       }
     }
-  }, []);
+  }, [eventsSource]);
 
   useEffect(() => {
     if (scrollContainerRef.current) {
@@ -976,17 +1048,26 @@ export default function FxCalendar({
 
   // Filtering lists
   const filteredEventsForSelectedDay = dynamicEventsList.filter((e) => {
-    // Exact Day representation match
-    const eventDayString = e.date.split('T')[0];
-    if (eventDayString !== selectedDayString) return false;
+    try {
+      // Robust timezone-agnostic day matching. Slicing the 'YYYY-MM-DD' prefix from the ISO date string (e.g., "2026-07-15T...")
+      // directly matches selectedDayString without any client-side timezone-shifting anomalies!
+      const eventDayString = String(e.date || '').substring(0, 10);
+      if (eventDayString !== selectedDayString) return false;
+    } catch (_) {
+      return false;
+    }
 
-    // Filters of currency
-    if (!activeCurrencies.includes(e.country)) return false;
+    // Filters of currency - safe case-insensitive comparison
+    const eventCountry = String(e.country || '').trim().toUpperCase();
+    const currenciesUpper = activeCurrencies.map(c => String(c).trim().toUpperCase());
+    if (!currenciesUpper.includes(eventCountry)) return false;
 
     // Filter by impact (map Holiday to Non-Econ)
-    let mappedImpact = e.impact;
+    let mappedImpact = String(e.impact || '').trim();
     if (mappedImpact === 'Holiday') mappedImpact = 'Non-Econ';
-    if (!activeImpacts.includes(mappedImpact)) return false;
+    
+    const impactsLower = activeImpacts.map(i => String(i).trim().toLowerCase());
+    if (!impactsLower.includes(mappedImpact.toLowerCase())) return false;
 
     return true;
   });
@@ -1280,7 +1361,7 @@ export default function FxCalendar({
         </div>
       )}
 
-      {/* Header section identical to screenshot */}
+      {/* Header section with clickable Date Picker trigger */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -1288,17 +1369,65 @@ export default function FxCalendar({
         marginBottom: '16px',
         paddingRight: '2px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div 
+          onClick={() => {
+            setIsDatePickerOpen(!isDatePickerOpen);
+            try {
+              const d = new Date(selectedDayString + 'T12:00:00Z');
+              if (!isNaN(d.getTime())) {
+                setPickerMonth(d.getUTCMonth());
+              }
+            } catch (_) {}
+          }}
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px',
+            cursor: 'pointer',
+            padding: '4px 8px',
+            borderRadius: '8px',
+            background: isDatePickerOpen 
+              ? (isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.06)')
+              : 'transparent',
+            transition: 'background 0.2s',
+            userSelect: 'none',
+          }}
+          title="Click to jump to another date"
+        >
           <div>
-            <InteractiveNewsHeader title={headerDetails.title} isLight={isLight} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <InteractiveNewsHeader title={headerDetails.title} isLight={isLight} />
+              <svg 
+                viewBox="0 0 24 24" 
+                width="13" 
+                height="13" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2.5" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+                style={{ 
+                  opacity: 0.6, 
+                  color: isLight ? '#475569' : '#94a3b8', 
+                  transform: isDatePickerOpen ? 'rotate(180deg)' : 'none',
+                  transition: 'transform 0.2s'
+                }}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </div>
             <p style={{
               fontSize: '12px',
-              fontWeight: 600,
-              color: isLight ? '#64748b' : '#94a3b8',
+              fontWeight: 700,
+              color: isLight ? '#2563eb' : '#38bdf8',
               margin: '3px 0 0 0',
-              fontFamily: 'var(--font-sans)'
+              fontFamily: 'var(--font-sans)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
             }}>
-              {headerDetails.subtitle}
+              <span>{headerDetails.subtitle}</span>
+              <span style={{ fontSize: '9px', opacity: 0.7, fontWeight: 500 }}>• jump calendar</span>
             </p>
           </div>
         </div>
@@ -1361,6 +1490,200 @@ export default function FxCalendar({
       </div>
 
       <div style={{ height: '1px', background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)', marginBottom: '8px' }} />
+
+      {/* Modern, interactive overlays for selecting months/days up to Dec 17th */}
+      {isDatePickerOpen && (
+        <div style={{
+          position: 'absolute',
+          top: '52px',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: isLight 
+            ? 'linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%)' 
+            : 'linear-gradient(135deg, #0a091d 0%, #0c0b24 100%)',
+          color: isLight ? '#1e293b' : '#f8fafc',
+          zIndex: 90,
+          display: 'flex',
+          flexDirection: 'column',
+          padding: '12px 14px',
+          boxSizing: 'border-box',
+          fontFamily: 'var(--font-sans), sans-serif',
+          borderTop: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)',
+        }}>
+          {/* Month selective pills */}
+          <div style={{ 
+            display: 'flex', 
+            gap: '5px', 
+            flexWrap: 'wrap', 
+            justifyContent: 'space-between',
+            marginBottom: '10px' 
+          }}>
+            {[
+              { name: 'Jun', value: 5 },
+              { name: 'Jul', value: 6 },
+              { name: 'Aug', value: 7 },
+              { name: 'Sep', value: 8 },
+              { name: 'Oct', value: 9 },
+              { name: 'Nov', value: 10 },
+              { name: 'Dec', value: 11 }
+            ].map(m => {
+              const isSelected = pickerMonth === m.value;
+              return (
+                <button
+                  key={m.value}
+                  onClick={() => setPickerMonth(m.value)}
+                  style={{
+                    padding: '5px 8px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    border: 'none',
+                    background: isSelected 
+                      ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' 
+                      : (isLight ? '#f1f5f9' : 'rgba(255,255,255,0.06)'),
+                    color: isSelected ? '#ffffff' : (isLight ? '#475569' : '#cbd5e1'),
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {m.name}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Weekday indicator labels */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(7, 1fr)', 
+            gap: '4px',
+            textAlign: 'center',
+            fontSize: '9px',
+            fontWeight: '800',
+            color: isLight ? '#94a3b8' : '#64748b',
+            marginBottom: '6px',
+            textTransform: 'uppercase'
+          }}>
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(label => (
+              <div key={label}>{label}</div>
+            ))}
+          </div>
+
+          {/* Calendar Grid */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(7, 1fr)', 
+            gap: '5px',
+            flex: 1,
+            overflowY: 'auto',
+            alignContent: 'start',
+            paddingRight: '2px',
+          }} className="custom-scroll">
+            {getDaysInMonthGrid(2026, pickerMonth).map((dayStr, idx) => {
+              if (dayStr === null) {
+                return <div key={`empty-${idx}`} style={{ height: '30px' }} />;
+              }
+              
+              const dateObj = new Date(dayStr + 'T12:00:00Z');
+              const dayOfMonth = dateObj.getUTCDate();
+              
+              const isToday = dayStr === getTodayString();
+              const isCurrentSelected = dayStr === selectedDayString;
+              const hasEventsNum = eventsCountMap[dayStr] || 0;
+              
+              const isWithinBounds = dayStr >= '2026-06-14' && dayStr <= '2026-12-17';
+
+              return (
+                <button
+                  key={dayStr}
+                  disabled={!isWithinBounds}
+                  onClick={() => {
+                    if (isWithinBounds) {
+                      setSelectedDayString(dayStr);
+                      setSimDate(new Date(`${dayStr}T08:00:00+01:00`));
+                      setIsDatePickerOpen(false);
+                    }
+                  }}
+                  style={{
+                    height: '30px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: isCurrentSelected ? '800' : '600',
+                    cursor: isWithinBounds ? 'pointer' : 'not-allowed',
+                    border: 'none',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    position: 'relative',
+                    opacity: isWithinBounds ? 1 : 0.25,
+                    background: isCurrentSelected
+                      ? 'linear-gradient(135deg, #0082ff 0%, #0056da 100%)'
+                      : isToday
+                        ? (isLight ? '#dbeafe' : 'rgba(59, 130, 246, 0.15)')
+                        : (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.03)'),
+                    color: isCurrentSelected
+                      ? '#ffffff'
+                      : isToday
+                        ? '#0082ff'
+                        : isLight ? '#334155' : '#cbd5e1',
+                    boxShadow: isCurrentSelected 
+                      ? '0 2px 4px rgba(0, 130, 255, 0.3)' 
+                      : (isLight ? '0 1px 1px rgba(0,0,0,0.03)' : 'none'),
+                    transition: 'all 0.1s ease',
+                  }}
+                  title={isWithinBounds ? `${dayStr}: ${hasEventsNum} Events` : 'Out of bounds'}
+                >
+                  <span style={{ transform: 'translateY(-1px)' }}>{dayOfMonth}</span>
+                  {hasEventsNum > 0 && (
+                    <span style={{
+                      position: 'absolute',
+                      bottom: '2px',
+                      width: '3.5px',
+                      height: '3.5px',
+                      borderRadius: '50%',
+                      background: isCurrentSelected ? '#ffffff' : '#a855f7',
+                      boxShadow: isCurrentSelected ? 'none' : '0 0 3px #a855f7',
+                    }} />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Helper Bottom Bar with Quick Search or Close Action */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginTop: '8px',
+            paddingTop: '6px',
+            borderTop: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)',
+            flexShrink: 0
+          }}>
+            <span style={{ fontSize: '10px', color: isLight ? '#64748b' : '#94a3b8', fontStyle: 'italic', fontWeight: 500 }}>
+              Showing events up to December 17th.
+            </span>
+            <button
+              onClick={() => setIsDatePickerOpen(false)}
+              style={{
+                background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.08)',
+                color: isLight ? '#475569' : '#cbd5e1',
+                border: 'none',
+                padding: '4px 8px',
+                borderRadius: '5px',
+                fontSize: '10.5px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                transition: 'all 0.1s ease',
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Scrolling Events list track */}
       <div ref={scrollContainerRef} className="custom-scroll no-drag" style={{
