@@ -1,41 +1,5 @@
 [
   {
-    "title": "BusinessNZ Services Index",
-    "country": "NZD",
-    "date": "2026-06-14T23:30:00+01:00",
-    "impact": "Low",
-    "forecast": "",
-    "previous": "48.7",
-    "actual": "47.5"
-  },
-  {
-    "title": "Rightmove HPI m/m",
-    "country": "GBP",
-    "date": "2026-06-15T00:01:00+01:00",
-    "impact": "Low",
-    "forecast": "",
-    "previous": "1.2%",
-    "actual": "-0.6%"
-  },
-  {
-    "title": "Tertiary Industry Activity m/m",
-    "country": "JPY",
-    "date": "2026-06-15T05:30:00+01:00",
-    "impact": "Low",
-    "forecast": "0.5%",
-    "previous": "-0.6%",
-    "actual": "1.3%"
-  },
-  {
-    "title": "German WPI m/m",
-    "country": "EUR",
-    "date": "2026-06-15T07:00:00+01:00",
-    "impact": "Low",
-    "forecast": "0.8%",
-    "previous": "2.0%",
-    "actual": "-0.6%"
-  },
-  {
     "title": "BOJ Policy Rate",
     "country": "JPY",
     "date": "2026-06-16T04:19:00+01:00",
@@ -66,6 +30,690 @@
     "title": "RBA Rate Statement",
     "country": "AUD",
     "date": "2026-06-16T05:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "RBA Press Conference",
+    "country": "AUD",
+    "date": "2026-06-16T06:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "BOJ Press Conference",
+    "country": "JPY",
+    "date": "2026-06-16T07:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "CPI y/y",
+    "country": "GBP",
+    "date": "2026-06-17T07:00:00+01:00",
+    "impact": "High",
+    "forecast": "3.0%",
+    "previous": "2.8%",
+    "actual": "2.8%"
+  },
+  {
+    "title": "Core Retail Sales m/m",
+    "country": "USD",
+    "date": "2026-06-17T13:30:00+01:00",
+    "impact": "Medium",
+    "forecast": "0.6%",
+    "previous": "0.7%",
+    "actual": "0.8%"
+  },
+  {
+    "title": "Retail Sales m/m",
+    "country": "USD",
+    "date": "2026-06-17T13:30:00+01:00",
+    "impact": "Medium",
+    "forecast": "0.5%",
+    "previous": "0.4%",
+    "actual": "0.9%"
+  },
+  {
+    "title": "Federal Funds Rate",
+    "country": "USD",
+    "date": "2026-06-17T19:00:00+01:00",
+    "impact": "High",
+    "forecast": "3.75%",
+    "previous": "3.75%",
+    "actual": "3.75%"
+  },
+  {
+    "title": "FOMC Economic Projections",
+    "country": "USD",
+    "date": "2026-06-17T19:00:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "FOMC Statement",
+    "country": "USD",
+    "date": "2026-06-17T19:00:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "FOMC Press Conference",
+    "country": "USD",
+    "date": "2026-06-17T19:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "GDP q/q",
+    "country": "NZD",
+    "date": "2026-06-17T23:45:00+01:00",
+    "impact": "High",
+    "forecast": "0.8%",
+    "previous": "0.5%",
+    "actual": "0.8%"
+  },
+  {
+    "title": "Claimant Count Change",
+    "country": "GBP",
+    "date": "2026-06-18T07:00:00+01:00",
+    "impact": "High",
+    "forecast": "25.8K",
+    "previous": "8.3K",
+    "actual": "31.2K"
+  },
+  {
+    "title": "SNB Policy Rate",
+    "country": "CHF",
+    "date": "2026-06-18T08:30:00+01:00",
+    "impact": "High",
+    "forecast": "0.00%",
+    "previous": "0.00%",
+    "actual": "0.00%"
+  },
+  {
+    "title": "Official Bank Rate",
+    "country": "GBP",
+    "date": "2026-06-18T12:00:00+01:00",
+    "impact": "High",
+    "forecast": "3.75%",
+    "previous": "3.75%",
+    "actual": "3.75%"
+  },
+  {
+    "title": "Retail Sales m/m",
+    "country": "GBP",
+    "date": "2026-06-19T07:00:00+01:00",
+    "impact": "Medium",
+    "forecast": "0.5%",
+    "previous": "-1.0%",
+    "actual": "1.2%"
+  },
+  {
+    "title": "CPI m/m",
+    "country": "CAD",
+    "date": "2026-06-22T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "0.4%",
+    "actual": ""
+  },
+  {
+    "title": "Median CPI y/y",
+    "country": "CAD",
+    "date": "2026-06-22T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "2.1%",
+    "actual": ""
+  },
+  {
+    "title": "Trimmed CPI y/y",
+    "country": "CAD",
+    "date": "2026-06-22T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "2.0%",
+    "actual": ""
+  },
+  {
+    "title": "Flash Manufacturing PMI",
+    "country": "USD",
+    "date": "2026-06-23T14:45:00+01:00",
+    "impact": "Medium",
+    "forecast": "",
+    "previous": "55.1",
+    "actual": ""
+  },
+  {
+    "title": "Flash Services PMI",
+    "country": "USD",
+    "date": "2026-06-23T14:45:00+01:00",
+    "impact": "Medium",
+    "forecast": "",
+    "previous": "50.9",
+    "actual": ""
+  },
+  {
+    "title": "CPI y/y",
+    "country": "AUD",
+    "date": "2026-06-24T02:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "4.2%",
+    "actual": ""
+  },
+  {
+    "title": "Employment Change",
+    "country": "AUD",
+    "date": "2026-06-25T02:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "-18.6K",
+    "actual": ""
+  },
+  {
+    "title": "Unemployment Rate",
+    "country": "AUD",
+    "date": "2026-06-25T02:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "4.5%",
+    "actual": ""
+  },
+  {
+    "title": "Core PCE Price Index m/m",
+    "country": "USD",
+    "date": "2026-06-25T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "0.2%",
+    "actual": ""
+  },
+  {
+    "title": "Final GDP q/q",
+    "country": "USD",
+    "date": "2026-06-25T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "1.6%",
+    "actual": ""
+  },
+  {
+    "title": "Tokyo Core CPI y/y",
+    "country": "JPY",
+    "date": "2026-06-26T00:30:00+01:00",
+    "impact": "Medium",
+    "forecast": "",
+    "previous": "1.3%",
+    "actual": ""
+  },
+  {
+    "title": "GDP m/m",
+    "country": "CAD",
+    "date": "2026-06-30T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "ISM Manufacturing PMI",
+    "country": "USD",
+    "date": "2026-07-01T15:00:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Core CPI Flash Estimate y/y",
+    "country": "EUR",
+    "date": "2026-07-01T10:00:00+01:00",
+    "impact": "Medium",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "CPI m/m",
+    "country": "CHF",
+    "date": "2026-07-02T07:30:00+01:00",
+    "impact": "Medium",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Average Hourly Earnings m/m",
+    "country": "USD",
+    "date": "2026-07-02T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Non-Farm Employment Change",
+    "country": "USD",
+    "date": "2026-07-02T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Unemployment Rate",
+    "country": "USD",
+    "date": "2026-07-02T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "ISM Services PMI",
+    "country": "USD",
+    "date": "2026-07-06T15:00:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Official Cash Rate",
+    "country": "NZD",
+    "date": "2026-07-08T03:00:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "RBNZ Rate Statement",
+    "country": "NZD",
+    "date": "2026-07-08T03:00:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "FOMC Meeting Minutes",
+    "country": "USD",
+    "date": "2026-07-08T19:00:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Employment Change",
+    "country": "CAD",
+    "date": "2026-07-10T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Unemployment Rate",
+    "country": "CAD",
+    "date": "2026-07-10T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Core CPI m/m",
+    "country": "USD",
+    "date": "2026-07-14T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "CPI y/y",
+    "country": "USD",
+    "date": "2026-07-14T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Core PPI m/m",
+    "country": "USD",
+    "date": "2026-07-15T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "BOC Rate Statement",
+    "country": "CAD",
+    "date": "2026-07-15T14:45:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Overnight Rate",
+    "country": "CAD",
+    "date": "2026-07-15T14:45:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "GDP m/m",
+    "country": "GBP",
+    "date": "2026-07-16T07:00:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Core Retail Sales m/m",
+    "country": "USD",
+    "date": "2026-07-16T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Retail Sales m/m",
+    "country": "USD",
+    "date": "2026-07-16T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "CPI m/m",
+    "country": "CAD",
+    "date": "2026-07-20T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "CPI q/q",
+    "country": "NZD",
+    "date": "2026-07-20T23:45:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Claimant Count Change",
+    "country": "GBP",
+    "date": "2026-07-21T07:00:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "CPI y/y",
+    "country": "GBP",
+    "date": "2026-07-22T07:00:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Employment Change",
+    "country": "AUD",
+    "date": "2026-07-23T02:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Main Refinancing Rate",
+    "country": "EUR",
+    "date": "2026-07-23T13:15:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "ECB Press Conference",
+    "country": "EUR",
+    "date": "2026-07-23T13:45:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "CPI m/m",
+    "country": "AUD",
+    "date": "2026-07-29T02:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Federal Funds Rate",
+    "country": "USD",
+    "date": "2026-07-29T19:00:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Official Bank Rate",
+    "country": "GBP",
+    "date": "2026-07-30T12:00:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Advance GDP q/q",
+    "country": "USD",
+    "date": "2026-07-30T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "BOJ Policy Rate",
+    "country": "JPY",
+    "date": "2026-07-31T02:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "GDP m/m",
+    "country": "CAD",
+    "date": "2026-07-31T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "ISM Manufacturing PMI",
+    "country": "USD",
+    "date": "2026-08-03T15:00:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Employment Change q/q",
+    "country": "NZD",
+    "date": "2026-08-04T23:45:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Unemployment Rate",
+    "country": "NZD",
+    "date": "2026-08-04T23:45:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "ISM Services PMI",
+    "country": "USD",
+    "date": "2026-08-05T15:00:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Employment Change",
+    "country": "CAD",
+    "date": "2026-08-07T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Unemployment Rate",
+    "country": "CAD",
+    "date": "2026-08-07T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Non-Farm Employment Change",
+    "country": "USD",
+    "date": "2026-08-07T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Unemployment Rate",
+    "country": "USD",
+    "date": "2026-08-07T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Cash Rate",
+    "country": "AUD",
+    "date": "2026-08-11T05:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Core CPI m/m",
+    "country": "USD",
+    "date": "2026-08-12T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "CPI y/y",
+    "country": "USD",
+    "date": "2026-08-12T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Claimant Count Change",
+    "country": "GBP",
+    "date": "2026-08-13T07:00:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "GDP m/m",
+    "country": "GBP",
+    "date": "2026-08-13T07:00:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Core PPI m/m",
+    "country": "USD",
+    "date": "2026-08-13T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "PPI m/m",
+    "country": "USD",
+    "date": "2026-08-13T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Core Retail Sales m/m",
+    "country": "USD",
+    "date": "2026-08-14T13:30:00+01:00",
+    "impact": "High",
+    "forecast": "",
+    "previous": "",
+    "actual": ""
+  },
+  {
+    "title": "Retail Sales m/m",
+    "country": "USD",
+    "date": "2026-08-14T13:30:00+01:00",
     "impact": "High",
     "forecast": "",
     "previous": "",

@@ -573,12 +573,12 @@ export default function FxCalendar({
       urlsToTry.push(REMOTE_JSON_URL.trim());
     } else {
       urlsToTry.push(
-        "/src/ff_data.json",
-        "/ff_data.json",
-        "https://raw.githubusercontent.com/Bl3551nq/overdesk-checklist/main/src/ff_data.json",
         "https://raw.githubusercontent.com/Bl3551nq/overdesk-nexus/main/src/ff_data.json",
+        "https://raw.githubusercontent.com/Bl3551nq/overdesk-nexus/main/ff_data.json",
+        "https://raw.githubusercontent.com/Bl3551nq/overdesk-checklist/main/src/ff_data.json",
         "https://raw.githubusercontent.com/Bl3551nq/overdesk-checklist/main/ff_data.json",
-        "https://raw.githubusercontent.com/Bl3551nq/overdesk-nexus/main/ff_data.json"
+        "/src/ff_data.json",
+        "/ff_data.json"
       );
     }
 
@@ -596,7 +596,9 @@ export default function FxCalendar({
 
       try {
         console.log(`Live remote loader trying: ${targetUrl}`);
-        const res = await fetch(targetUrl);
+        const isRemote = targetUrl.startsWith('http://') || targetUrl.startsWith('https://');
+        const finalUrl = isRemote ? `${targetUrl}${targetUrl.includes('?') ? '&' : '?'}_t=${Date.now()}` : targetUrl;
+        const res = await fetch(finalUrl);
         if (!res.ok) {
           throw new Error(`HTTP error ${res.status}`);
         }
@@ -660,25 +662,35 @@ export default function FxCalendar({
   };
 
   const getDayList = () => {
-    const elapsedWeeks = getLaunchElapsedWeeks();
-    const baseDate = new Date('2026-06-14T12:00:00');
-    // Start generating days from 14 weeks ago (98 days in the past) to cover 3 full months
-    const startWeekOffset = Math.max(0, elapsedWeeks - 14);
-    const start = new Date(baseDate.getTime() + startWeekOffset * 7 * 24 * 60 * 60 * 1000);
-    
-    // Find current elapsed weeks from simulator's simDate to dynamically add future weeks
-    const simBaseDate = new Date('2026-06-14T00:00:00Z');
-    const simElapsedWeeks = Math.floor((simDate.getTime() - simBaseDate.getTime()) / (7 * 24 * 60 * 60 * 1000));
-    const activeElapsed = Math.max(0, simElapsedWeeks);
-    
-    // We want the end to be at least 4 weeks (28 days) ahead of the current simDate week (so activeElapsed + 5 weeks)
-    const endWeekOffset = Math.max(5, activeElapsed + 5); 
-    const totalWeeksInList = 14 + endWeekOffset;
-    const totalDays = totalWeeksInList * 7;
-    
     const list: string[] = [];
+    
+    // Support past events accessible up to 3 months (90 days) prior to appLaunchRealDate
+    const start = new Date(appLaunchRealDate.getTime() - 90 * 24 * 60 * 60 * 1000);
+    
+    // Always go at least 30 days into the future relative to appLaunchRealDate, or up to the maximum event date
+    let maxFutureMs = appLaunchRealDate.getTime() + 30 * 24 * 60 * 60 * 1000;
+    if (eventsSource && eventsSource.length > 0) {
+      eventsSource.forEach(e => {
+        try {
+          const t = new Date(e.date).getTime();
+          if (!isNaN(t) && t > maxFutureMs) {
+            maxFutureMs = t;
+          }
+        } catch (_) {}
+      });
+    }
+    const end = new Date(maxFutureMs);
+    
+    // Calculate precise range difference in days to build the list
+    const diffMs = end.getTime() - start.getTime();
+    const totalDays = Math.max(30, Math.ceil(diffMs / (24 * 60 * 60 * 1000))) + 2; // small safety padding
+    
+    const baseWalk = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 12, 0, 0);
     for (let i = 0; i < totalDays; i++) {
-      const d = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
+      const d = new Date(baseWalk.getTime() + i * 24 * 60 * 60 * 1000);
+      if (d.getTime() > end.getTime() + 24 * 60 * 60 * 1000) {
+        break;
+      }
       const yyyy = d.getFullYear();
       const mm = String(d.getMonth() + 1).padStart(2, '0');
       const dd = String(d.getDate()).padStart(2, '0');
@@ -709,42 +721,9 @@ export default function FxCalendar({
   };
 
   const getDynamicEvents = () => {
-    const baseDate = new Date('2026-06-14T00:00:00Z');
-    const list: FxEvent[] = [];
-    
-    const dList = getDayList();
-    if (dList.length === 0) return [];
-    
-    const firstDayStr = dList[0];
-    const lastDayStr = dList[dList.length - 1];
-    
-    const startMs = new Date(firstDayStr + 'T00:00:00Z').getTime();
-    const endMs = new Date(lastDayStr + 'T23:59:59Z').getTime();
-    const cycleMs = 14 * 24 * 60 * 60 * 1000;
-
-    eventsSource.forEach(e => {
-      const eDate = new Date(e.date);
-      const offsetMs = eDate.getTime() - baseDate.getTime();
-      const offsetInCycle = ((offsetMs % cycleMs) + cycleMs) % cycleMs;
-      
-      // Automatically calculate cycle range covering the start to end range of the list
-      const startCycle = Math.floor((startMs - baseDate.getTime() - offsetInCycle) / cycleMs) - 1;
-      const endCycle = Math.ceil((endMs - baseDate.getTime() - offsetInCycle) / cycleMs) + 1;
-      
-      for (let c = startCycle; c <= endCycle; c++) {
-        const cycleDate = new Date(baseDate.getTime() + offsetInCycle + (c * cycleMs));
-        const itemMs = cycleDate.getTime();
-        // Check if the cycle date is in our calendar window
-        if (itemMs >= startMs - 24 * 60 * 60 * 1000 && itemMs <= endMs + 24 * 60 * 60 * 1000) {
-          const daysDiff = Math.round((cycleDate.getTime() - eDate.getTime()) / (24 * 60 * 60 * 1000));
-          list.push({
-            ...e,
-            date: shiftIsoDateString(e.date, daysDiff),
-          });
-        }
-      }
-    });
-    return list;
+    // Simply load and display the actual events directly from the loaded github / local file
+    // without any artificial offsets, 14-day modulo cycles, or artificial week-by-week shifts.
+    return eventsSource;
   };
 
   const dynamicEventsList = getDynamicEvents();
