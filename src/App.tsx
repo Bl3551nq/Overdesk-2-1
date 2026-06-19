@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import BorderGlow from './components/BorderGlow';
-const overdeskLogo = 'https://raw.githubusercontent.com/Bl3551nq/Overdesk-Logos/refs/heads/main/OVERDESK-fx%20calendar.svg';
+const overdeskLogo = 'https://raw.githubusercontent.com/Bl3551nq/Overdesk-Logos/refs/heads/main/Overdesk%20Nexus.svg';
 import FxCalendar, { playSynthSound } from './components/FxCalendar';
 
 // Declaration to access global Electron API from preload script
@@ -963,8 +963,31 @@ export default function App() {
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.clearRect(0, 0, 48, 48);
-            ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(img, 0, 0, 48, 48);
+            
+            // Auto-calculate exact aspect ratio proportions to prevent stretching
+            const imgAspect = img.width / img.height || 1.0;
+            let drawWidth = 48;
+            let drawHeight = 48;
+
+            if (imgAspect > 1.0) { // wider than tall
+              drawWidth = 48;
+              drawHeight = 48 / imgAspect;
+            } else { // taller than wide or square
+              drawHeight = 48;
+              drawWidth = 48 * imgAspect;
+            }
+
+            // We apply a zoom/scale-up factor (1.45x) to crop the inner transparency and make the logo appear significantly bigger in the OS task bar / tray
+            const zoomFactor = 1.45;
+            const finalW = drawWidth * zoomFactor;
+            const finalH = drawHeight * zoomFactor;
+            const finalX = (48 - finalW) / 2;
+            const finalY = (48 - finalH) / 2;
+
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, finalX, finalY, finalW, finalH);
+
             const dataUrl = canvas.toDataURL('image/png');
             (window as any).electronAPI.saveIcon(dataUrl);
           }

@@ -240,10 +240,9 @@ const getImpactColor = (impact: FxEvent['impact']) => {
     case 'Low':
       return '#f59e0b'; // Gold / Yellow
     case 'Holiday':
-      return '#a855f7'; // Purple
     case 'Non-Econ':
     default:
-      return '#3b82f6'; // Blue
+      return '#94a3b8'; // Grey
   }
 };
 
@@ -258,9 +257,10 @@ const getImpactBadgeStyles = (impact: FxEvent['impact'], isLight: boolean) => {
         ? { background: 'rgba(249, 115, 22, 0.08)', color: '#ea580c' }
         : { background: 'rgba(249, 115, 22, 0.15)', color: '#fb923c' };
     case 'Holiday':
+    case 'Non-Econ':
       return isLight
-        ? { background: 'rgba(168, 85, 247, 0.08)', color: '#7c3aed' }
-        : { background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc' };
+        ? { background: 'rgba(148, 163, 184, 0.12)', color: '#475569' }
+        : { background: 'rgba(148, 163, 184, 0.18)', color: '#94a3b8' };
     case 'Low':
     default:
       return isLight
@@ -1886,8 +1886,8 @@ export default function FxCalendar({
             {/* Tiny Division Line */}
             <div style={{
               height: '1px',
-              background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
-              margin: '2px 0'
+              background: isLight ? 'rgba(15, 23, 42, 0.08)' : 'rgba(255, 255, 255, 0.08)',
+              margin: '6px 0'
             }} />
 
             {/* Filter Currencies */}
@@ -1954,8 +1954,8 @@ export default function FxCalendar({
             {/* Tiny Division Line */}
             <div style={{
               height: '1px',
-              background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
-              margin: '2px 0'
+              background: isLight ? 'rgba(15, 23, 42, 0.08)' : 'rgba(255, 255, 255, 0.08)',
+              margin: '6px 0'
             }} />
 
             {/* Event Alert Signals */}
@@ -2235,8 +2235,8 @@ export default function FxCalendar({
             {/* Tiny Division Line */}
             <div style={{
               height: '1px',
-              background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
-              margin: '2px 0'
+              background: isLight ? 'rgba(15, 23, 42, 0.08)' : 'rgba(255, 255, 255, 0.08)',
+              margin: '6px 0'
             }} />
 
             {/* Disclosure Metrics */}
@@ -2282,8 +2282,8 @@ export default function FxCalendar({
             {/* Tiny Division Line */}
             <div style={{
               height: '1px',
-              background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
-              margin: '2px 0'
+              background: isLight ? 'rgba(15, 23, 42, 0.08)' : 'rgba(255, 255, 255, 0.08)',
+              margin: '6px 0'
             }} />
 
             {/* Time Display Region */}
