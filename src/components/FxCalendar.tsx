@@ -417,6 +417,17 @@ export default function FxCalendar({
     }
   };
 
+  // Stable baseline date based on the actual date when the app was launched
+  const [appLaunchRealDate] = useState<Date>(() => {
+    try {
+      const now = new Date();
+      if (now.getFullYear() === 2026 && now.getMonth() === 5) {
+        return now;
+      }
+    } catch (_) {}
+    return new Date('2026-06-19T02:00:00+01:00');
+  });
+
   // Simulator Time state - initialized to current date and time (if within range) or relative to fallback:
   const [simDate, setSimDate] = useState<Date>(() => {
     try {
@@ -638,18 +649,35 @@ export default function FxCalendar({
     fetchRemoteEvents();
   }, []);
 
-  const getElapsedWeeks = () => {
+  const getLaunchElapsedWeeks = () => {
     const baseDate = new Date('2026-06-14T00:00:00Z');
-    const elapsedWeeks = Math.max(0, Math.floor((simDate.getTime() - baseDate.getTime()) / (7 * 24 * 60 * 60 * 1000)));
-    return elapsedWeeks;
+    const elapsedWeeks = Math.floor((appLaunchRealDate.getTime() - baseDate.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    return Math.max(0, elapsedWeeks);
+  };
+
+  const getElapsedWeeks = () => {
+    return getLaunchElapsedWeeks();
   };
 
   const getDayList = () => {
-    const elapsedWeeks = getElapsedWeeks();
+    const elapsedWeeks = getLaunchElapsedWeeks();
     const baseDate = new Date('2026-06-14T12:00:00');
-    const start = new Date(baseDate.getTime() + elapsedWeeks * 7 * 24 * 60 * 60 * 1000);
+    // Start generating days from 14 weeks ago (98 days in the past) to cover 3 full months
+    const startWeekOffset = Math.max(0, elapsedWeeks - 14);
+    const start = new Date(baseDate.getTime() + startWeekOffset * 7 * 24 * 60 * 60 * 1000);
+    
+    // Find current elapsed weeks from simulator's simDate to dynamically add future weeks
+    const simBaseDate = new Date('2026-06-14T00:00:00Z');
+    const simElapsedWeeks = Math.floor((simDate.getTime() - simBaseDate.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    const activeElapsed = Math.max(0, simElapsedWeeks);
+    
+    // We want the end to be at least 4 weeks (28 days) ahead of the current simDate week (so activeElapsed + 5 weeks)
+    const endWeekOffset = Math.max(5, activeElapsed + 5); 
+    const totalWeeksInList = 14 + endWeekOffset;
+    const totalDays = totalWeeksInList * 7;
+    
     const list: string[] = [];
-    for (let i = 0; i < 28; i++) { // 4 weeks = 28 days
+    for (let i = 0; i < totalDays; i++) {
       const d = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
       const yyyy = d.getFullYear();
       const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -682,36 +710,46 @@ export default function FxCalendar({
 
   const getDynamicEvents = () => {
     const baseDate = new Date('2026-06-14T00:00:00Z');
-    const elapsedWeeks = getElapsedWeeks();
-    const windowStartMs = baseDate.getTime() + elapsedWeeks * 7 * 24 * 60 * 60 * 1000;
-    const cycleMs = 14 * 24 * 60 * 60 * 1000;
     const list: FxEvent[] = [];
+    
+    const dList = getDayList();
+    if (dList.length === 0) return [];
+    
+    const firstDayStr = dList[0];
+    const lastDayStr = dList[dList.length - 1];
+    
+    const startMs = new Date(firstDayStr + 'T00:00:00Z').getTime();
+    const endMs = new Date(lastDayStr + 'T23:59:59Z').getTime();
+    const cycleMs = 14 * 24 * 60 * 60 * 1000;
+
     eventsSource.forEach(e => {
       const eDate = new Date(e.date);
       const offsetMs = eDate.getTime() - baseDate.getTime();
       const offsetInCycle = ((offsetMs % cycleMs) + cycleMs) % cycleMs;
       
-      const date1 = new Date(windowStartMs + offsetInCycle);
-      const date2 = new Date(windowStartMs + offsetInCycle + cycleMs);
+      // Automatically calculate cycle range covering the start to end range of the list
+      const startCycle = Math.floor((startMs - baseDate.getTime() - offsetInCycle) / cycleMs) - 1;
+      const endCycle = Math.ceil((endMs - baseDate.getTime() - offsetInCycle) / cycleMs) + 1;
       
-      const daysDiff1 = Math.round((date1.getTime() - eDate.getTime()) / (24 * 60 * 60 * 1000));
-      const daysDiff2 = Math.round((date2.getTime() - eDate.getTime()) / (24 * 60 * 60 * 1000));
-
-      list.push({
-        ...e,
-        date: shiftIsoDateString(e.date, daysDiff1),
-      });
-      list.push({
-        ...e,
-        date: shiftIsoDateString(e.date, daysDiff2),
-      });
+      for (let c = startCycle; c <= endCycle; c++) {
+        const cycleDate = new Date(baseDate.getTime() + offsetInCycle + (c * cycleMs));
+        const itemMs = cycleDate.getTime();
+        // Check if the cycle date is in our calendar window
+        if (itemMs >= startMs - 24 * 60 * 60 * 1000 && itemMs <= endMs + 24 * 60 * 60 * 1000) {
+          const daysDiff = Math.round((cycleDate.getTime() - eDate.getTime()) / (24 * 60 * 60 * 1000));
+          list.push({
+            ...e,
+            date: shiftIsoDateString(e.date, daysDiff),
+          });
+        }
+      }
     });
     return list;
   };
 
   const dynamicEventsList = getDynamicEvents();
 
-  // Keep selectedDayString within the valid 4-week dayList
+  // Keep selectedDayString within the valid dayList
   useEffect(() => {
     const list = getDayList();
     if (!list.includes(selectedDayString)) {
@@ -722,7 +760,7 @@ export default function FxCalendar({
         setSelectedDayString(list[0]);
       }
     }
-  }, [simDate]);
+  }, []);
 
   useEffect(() => {
     if (scrollContainerRef.current) {
