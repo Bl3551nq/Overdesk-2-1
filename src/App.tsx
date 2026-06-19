@@ -1399,7 +1399,7 @@ export default function App() {
         className={`card-glow-wrapper ${minimized ? 'minimized' : ''} ${isLight ? 'light' : ''}`}
         edgeSensitivity={30}
         glowColor={isLight ? "240 50% 70%" : "268 80% 65%"}
-        backgroundColor={isLight ? "rgba(245, 245, 250, 0.98)" : "rgba(3, 5, 20, 0.95)"}
+        backgroundColor={isLight ? (activeApp === 'calendar' ? "rgba(235, 244, 255, 0.95)" : "rgba(245, 245, 250, 0.98)") : "rgba(3, 5, 20, 0.95)"}
         borderRadius={36}
         glowRadius={50}
         glowIntensity={1.0}
@@ -1420,6 +1420,9 @@ export default function App() {
           cursor: isGripped ? 'grabbing' : undefined,
           minHeight: (settingsOpen && !minimized) ? '390px' : undefined,
           boxShadow: !licenseActive ? 'none' : (isGripped ? `0 18px 50px 5px ${modes[currentMode]?.soft || 'var(--accent-soft)'}, 0 6px 18px rgba(0, 0, 0, 0.45)` : undefined),
+          background: (isLight && activeApp === 'calendar')
+            ? 'linear-gradient(135deg, rgba(246, 251, 255, 0.98) 0%, rgba(232, 244, 255, 0.95) 100%)'
+            : undefined
         }}
       >
         <div

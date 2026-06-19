@@ -1208,15 +1208,15 @@ export default function FxCalendar({
       overflow: 'hidden',
       position: 'relative',
       background: isLight 
-        ? 'rgba(255, 255, 255, 0.45)' 
+        ? 'linear-gradient(135deg, rgba(242, 248, 255, 0.6) 0%, rgba(228, 240, 255, 0.4) 100%)' 
         : 'radial-gradient(circle at 50% 20%, #121030 0%, #070617 100%)',
       backdropFilter: isLight ? 'blur(16px)' : undefined,
       WebkitBackdropFilter: isLight ? 'blur(16px)' : undefined,
       borderRadius: '24px',
       padding: '14px 10px 10px 10px',
-      border: isLight ? '1px solid rgba(255, 255, 255, 0.5)' : '1px solid rgba(255, 255, 255, 0.05)',
+      border: isLight ? '1px solid rgba(255, 255, 255, 0.6)' : '1px solid rgba(255, 255, 255, 0.05)',
       boxShadow: isLight 
-        ? 'inset 0 1px 1px rgba(255, 255, 255, 0.4), 0 8px 32px 0 rgba(31, 38, 135, 0.05)' 
+        ? 'inset 0 1px 1.5px rgba(255, 255, 255, 0.65), 0 8px 32px 0 rgba(31, 38, 135, 0.06)' 
         : 'inset 0 1px 1px rgba(255,255,255,0.03), 0 10px 40px rgba(0,0,0,0.35)',
     }}>
       
@@ -1351,7 +1351,7 @@ export default function FxCalendar({
         overflowY: 'auto',
         paddingRight: '4px',
         touchAction: 'pan-y',
-        pointerEvents: 'auto'
+        pointerEvents: 'auto',
       }}>
         <AnimatePresence mode="wait">
           <motion.div
