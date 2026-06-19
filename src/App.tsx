@@ -1419,7 +1419,7 @@ export default function App() {
           transition: isGripped ? 'transform 0s, box-shadow 0.2s ease' : 'transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, padding 0.35s cubic-bezier(0.4, 0, 0.2, 1), min-height 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
           cursor: isGripped ? 'grabbing' : undefined,
           minHeight: (settingsOpen && !minimized) ? '390px' : undefined,
-          boxShadow: !licenseActive ? 'none' : (isGripped ? `0 18px 50px 5px ${modes[currentMode]?.soft || 'var(--accent-soft)'}, 0 6px 18px rgba(0, 0, 0, 0.45)` : undefined),
+          boxShadow: !licenseActive ? 'none' : (isGripped ? (isLight ? '0 24px 64px -6px rgba(15, 23, 42, 0.12), 0 12px 24px -8px rgba(15, 23, 42, 0.08)' : `0 18px 50px 5px ${modes[currentMode]?.soft || 'var(--accent-soft)'}, 0 6px 18px rgba(0, 0, 0, 0.45)`) : undefined),
           background: (isLight && activeApp === 'calendar')
             ? 'linear-gradient(135deg, rgba(246, 251, 255, 0.98) 0%, rgba(232, 244, 255, 0.95) 100%)'
             : undefined

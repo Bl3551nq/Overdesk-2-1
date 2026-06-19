@@ -14,6 +14,8 @@ html, body {
   align-items: flex-start;
   justify-content: center;
   overflow: hidden;
+  padding-top: 24px;
+  box-sizing: border-box;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   user-select: none;
   background: transparent !important;
@@ -1298,6 +1300,15 @@ body.editing .option { cursor: default; }
   transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
   width: 320px !important;
   box-sizing: border-box !important;
+}
+
+.border-glow-card.light {
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 
+    0 1px 3px rgba(15, 23, 42, 0.01),
+    0 4px 12px rgba(15, 23, 42, 0.03),
+    0 12px 32px -4px rgba(15, 23, 42, 0.06),
+    0 28px 64px -10px rgba(15, 23, 42, 0.08) !important;
 }
 
 .border-glow-card .card {

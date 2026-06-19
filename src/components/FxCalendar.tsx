@@ -1515,7 +1515,7 @@ export default function FxCalendar({
                             WebkitBackdropFilter: 'blur(16px)',
                             border: isLight 
                               ? '1px solid rgba(255, 255, 255, 0.8)' 
-                              : '1px solid rgba(255, 255, 255, 0.08)',
+                              : '1px solid rgba(255, 255, 255, 0.03)',
                             borderRadius: '12px',
                             padding: '8px 11px',
                             boxShadow: isLight 
@@ -1534,7 +1534,7 @@ export default function FxCalendar({
                               : '0 8px 20px rgba(0, 130, 255, 0.1), inset 0 1px 1px rgba(255,255,255,0.08)',
                             borderColor: isLight
                               ? 'rgba(255, 255, 255, 0.95)'
-                              : 'rgba(255, 255, 255, 0.15)'
+                              : 'rgba(255, 255, 255, 0.05)'
                           }}
                         >
                           {/* Title & Badge Header line */}
