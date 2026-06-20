@@ -1392,6 +1392,7 @@ export default function FxCalendar({
               }
             } catch (_) {}
           }}
+          className="no-drag"
           style={{ 
             display: 'flex', 
             alignItems: 'center', 
@@ -1506,7 +1507,7 @@ export default function FxCalendar({
 
       {/* Modern, interactive overlays for selecting months/days up to Dec 17th */}
       {isDatePickerOpen && (
-        <div style={{
+        <div className="no-drag" style={{
           position: 'absolute',
           top: '52px',
           left: 0,
