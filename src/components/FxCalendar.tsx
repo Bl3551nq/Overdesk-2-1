@@ -77,11 +77,17 @@ export const sanitizeEvents = (raw: any[]): FxEvent[] => {
 // Converts an ISO/Offset event date string to a YYYY-MM-DD day string representation in the user's local timezone
 export const getLocalEventDayString = (isoString: string): string => {
   try {
+    // Extract YYYY-MM-DD directly from the ISO string before the T
+    // This preserves the date as scraped from Forex Factory (+01:00 WAT)
+    // and avoids browser/OS timezone shifting the day boundary
+    const datePart = String(isoString || '').substring(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return datePart;
+    // Fallback: parse and use UTC date
     const d = new Date(isoString);
-    if (isNaN(d.getTime())) return String(isoString || '').substring(0, 10);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
+    if (isNaN(d.getTime())) return datePart;
+    const yyyy = d.getUTCFullYear();
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(d.getUTCDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   } catch (_) {
     return String(isoString || '').substring(0, 10);
@@ -1115,9 +1121,18 @@ export default function FxCalendar({
   // Format Helper to give exactly "HH:MM AM/PM" with leading zeroes (e.g. 12:01 AM, 07:00 AM)
   const format12Hour = (isoString: string) => {
     try {
-      const d = new Date(isoString);
-      let hours = d.getHours();
-      let minutes = d.getMinutes();
+      let hours = 0;
+      let minutes = 0;
+      const timePart = isoString.match(/T(\d{2}):(\d{2})/);
+      if (timePart) {
+        hours = parseInt(timePart[1], 10);
+        minutes = parseInt(timePart[2], 10);
+      } else {
+        const d = new Date(isoString);
+        if (isNaN(d.getTime())) return "00:00 AM";
+        hours = d.getHours();
+        minutes = d.getMinutes();
+      }
       const ampm = hours >= 12 ? 'PM' : 'AM';
       hours = hours % 12;
       hours = hours ? hours : 12; // 0 is 12
@@ -1135,12 +1150,20 @@ export default function FxCalendar({
     try {
       const d = new Date(isoString);
       if (isNaN(d.getTime())) return "00:00";
+      
+      // Parse time directly from ISO string to avoid local timezone shift
+      const timePart = isoString.match(/T(\d{2}):(\d{2})/);
+      if (!timePart) return "00:00";
+      
+      let hours = parseInt(timePart[1], 10);
+      const minutes = parseInt(timePart[2], 10);
+      
       if (clockFormat === '24') {
-        const hours = String(d.getHours()).padStart(2, '0');
-        const minutes = String(d.getMinutes()).padStart(2, '0');
-        return `${hours}:${minutes}`;
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
       } else {
-        return format12Hour(isoString);
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12 || 12;
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${ampm}`;
       }
     } catch (_) {
       return "00:00";
