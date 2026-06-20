@@ -27,6 +27,17 @@ export const sanitizeEvents = (raw: any[]): FxEvent[] => {
         if (!item) return null;
         
         let dateStr = String(item.date || '').trim();
+        // Automatically correct invalid hour formats like T29:00:00+01:00 to T05:00:00+01:00 on the same day,
+        // or any other hour >= 24 to keep the date valid and prevent parsing failure!
+        const hourMatch = dateStr.match(/T(\d{2}):/);
+        if (hourMatch) {
+          const hours = parseInt(hourMatch[1], 10);
+          if (hours >= 24) {
+            const correctedHours = String(hours % 24).padStart(2, '0');
+            dateStr = dateStr.replace(`T${hourMatch[1]}:`, `T${correctedHours}:`);
+          }
+        }
+
         // Replace colons in YYYY:MM:DD formatted strings if present
         if (dateStr.includes(':') && !dateStr.includes('-') && (dateStr.indexOf(':') < dateStr.indexOf('T') || !dateStr.includes('T'))) {
           const parts = dateStr.split(':');
@@ -61,6 +72,20 @@ export const sanitizeEvents = (raw: any[]): FxEvent[] => {
       }
     })
     .filter((e): e is FxEvent => e !== null);
+};
+
+// Converts an ISO/Offset event date string to a YYYY-MM-DD day string representation in the user's local timezone
+export const getLocalEventDayString = (isoString: string): string => {
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return String(isoString || '').substring(0, 10);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  } catch (_) {
+    return String(isoString || '').substring(0, 10);
+  }
 };
 
 // Define remote custom high-fidelity MP3 chimes hosted on GitHub raw CDN
@@ -478,16 +503,7 @@ export default function FxCalendar({
   const [simDate, setSimDate] = useState<Date>(() => {
     try {
       const todayStr = getTodayString();
-      const list = [];
-      const start = new Date('2026-06-14T12:00:00');
-      for (let i = 0; i <= 14; i++) {
-        const d = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const dd = String(d.getDate()).padStart(2, '0');
-        list.push(`${yyyy}-${mm}-${dd}`);
-      }
-      if (list.includes(todayStr)) {
+      if (todayStr >= '2026-06-14' && todayStr <= '2026-12-17') {
         return new Date();
       }
     } catch (_) {}
@@ -536,16 +552,7 @@ export default function FxCalendar({
   const [selectedDayString, setSelectedDayString] = useState<string>(() => {
     try {
       const todayStr = getTodayString();
-      const list = [];
-      const start = new Date('2026-06-14T12:00:00');
-      for (let i = 0; i <= 14; i++) {
-        const d = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const dd = String(d.getDate()).padStart(2, '0');
-        list.push(`${yyyy}-${mm}-${dd}`);
-      }
-      if (list.includes(todayStr)) {
+      if (todayStr >= '2026-06-14' && todayStr <= '2026-12-17') {
         return todayStr;
       }
     } catch (_) {}
@@ -663,9 +670,17 @@ export default function FxCalendar({
           throw new Error("Events list array is empty");
         }
 
-        setEventsSource(validated);
+        // Set the successfully fetched remote events as the authoritative list directly,
+        // without blending with old/stale local default compiled values.
+        // This ensures what you upload on GitHub is 100% accurate, allowing you
+        // to delete, modify, or add events freely.
+        const sortedEvents = [...validated].sort((a, b) => {
+          return new Date(a.date).getTime() - new Date(b.date).getTime();
+        });
+
+        setEventsSource(sortedEvents);
         setSyncStatus('success');
-        console.log(`Successfully synced live news! Loaded ${validated.length} events from ${targetUrl}`);
+        console.log(`Successfully synced live news! Loaded ${sortedEvents.length} authoritative events from ${targetUrl}.`);
         return; // Success, exit function
       } catch (err: any) {
         console.warn(`Candidate path [${targetUrl}] failed:`, err.message || err);
@@ -704,7 +719,7 @@ export default function FxCalendar({
     if (eventsSource && eventsSource.length > 0) {
       eventsSource.forEach(e => {
         try {
-          const dStr = String(e.date || '').substring(0, 10);
+          const dStr = getLocalEventDayString(e.date);
           if (dStr && dStr.length === 10) {
             const dObj = new Date(dStr);
             if (!isNaN(dObj.getTime()) && dObj.getFullYear() >= 2000) {
@@ -759,7 +774,7 @@ export default function FxCalendar({
     if (eventsSource && eventsSource.length > 0) {
       eventsSource.forEach(e => {
         try {
-          const dateString = String(e.date || '').substring(0, 10);
+          const dateString = getLocalEventDayString(e.date);
           if (dateString) {
             map[dateString] = (map[dateString] || 0) + 1;
           }
@@ -1049,9 +1064,7 @@ export default function FxCalendar({
   // Filtering lists
   const filteredEventsForSelectedDay = dynamicEventsList.filter((e) => {
     try {
-      // Robust timezone-agnostic day matching. Slicing the 'YYYY-MM-DD' prefix from the ISO date string (e.g., "2026-07-15T...")
-      // directly matches selectedDayString without any client-side timezone-shifting anomalies!
-      const eventDayString = String(e.date || '').substring(0, 10);
+      const eventDayString = getLocalEventDayString(e.date);
       if (eventDayString !== selectedDayString) return false;
     } catch (_) {
       return false;
@@ -1121,6 +1134,7 @@ export default function FxCalendar({
   const formatTime = (isoString: string) => {
     try {
       const d = new Date(isoString);
+      if (isNaN(d.getTime())) return "00:00";
       if (clockFormat === '24') {
         const hours = String(d.getHours()).padStart(2, '0');
         const minutes = String(d.getMinutes()).padStart(2, '0');
@@ -1138,11 +1152,10 @@ export default function FxCalendar({
       const d = new Date(selectedDayString + 'T12:00:00Z');
       const weekdayName = d.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' }); // Friday, Wednesday, Mon...
       const formattedDate = d.toLocaleDateString('en-US', {
-        weekday: 'short',
         month: 'short',
         day: 'numeric',
         timeZone: 'UTC'
-      }); // Fri, Jun 19
+      }); // Jun 19
       
       const isToday = selectedDayString === getTodayString();
       
@@ -1427,7 +1440,7 @@ export default function FxCalendar({
               gap: '4px'
             }}>
               <span>{headerDetails.subtitle}</span>
-              <span style={{ fontSize: '9px', opacity: 0.7, fontWeight: 500 }}>• jump calendar</span>
+              <span style={{ fontSize: '9px', opacity: 0.7, fontWeight: 500 }}>• Jump To</span>
             </p>
           </div>
         </div>
@@ -1592,7 +1605,7 @@ export default function FxCalendar({
               const isCurrentSelected = dayStr === selectedDayString;
               const hasEventsNum = eventsCountMap[dayStr] || 0;
               
-              const isWithinBounds = dayStr >= '2026-06-14' && dayStr <= '2026-12-17';
+              const isWithinBounds = dayList.includes(dayStr);
 
               return (
                 <button
@@ -1652,19 +1665,16 @@ export default function FxCalendar({
             })}
           </div>
 
-          {/* Helper Bottom Bar with Quick Search or Close Action */}
+          {/* Helper Bottom Bar with Close Action */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
+            justifyContent: 'flex-end',
             marginTop: '8px',
             paddingTop: '6px',
             borderTop: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)',
             flexShrink: 0
           }}>
-            <span style={{ fontSize: '10px', color: isLight ? '#64748b' : '#94a3b8', fontStyle: 'italic', fontWeight: 500 }}>
-              Showing events up to December 17th.
-            </span>
             <button
               onClick={() => setIsDatePickerOpen(false)}
               style={{
