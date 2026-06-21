@@ -1,6 +1,8 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
+const os = require('os');
 const { autoUpdater } = require('electron-updater');
 
 // Keep variables in higher scope to prevent garbage collection
@@ -337,18 +339,20 @@ ipcMain.handle('check-license', () => {
 });
 
 // Gumroad License verify
-const crypto = require('crypto');
-const os = require('os');
-
 function getMachineId() {
-  const raw = [
-    os.hostname(),
-    os.platform(),
-    os.arch(),
-    os.cpus()[0]?.model || '',
-    os.totalmem(),
-  ].join('|');
-  return crypto.createHash('sha256').update(raw).digest('hex');
+  try {
+    const cpuModel = (os.cpus() && os.cpus().length > 0) ? os.cpus()[0].model : 'unknown-cpu';
+    const raw = [
+      String(os.hostname() || 'unknown-host'),
+      String(os.platform() || 'unknown-platform'),
+      String(os.arch() || 'unknown-arch'),
+      String(cpuModel),
+      String(os.totalmem() || '0'),
+    ].join('|');
+    return crypto.createHash('sha256').update(raw).digest('hex');
+  } catch (e) {
+    return crypto.createHash('sha256').update('fallback-machine-id').digest('hex');
+  }
 }
 
 const ENCRYPTION_KEY = crypto.createHash('sha256').update('OverdeskNexusLicenseSalt2026').digest();
@@ -404,12 +408,14 @@ ipcMain.handle('validate-license', async (event, rawKey) => {
   const alreadyActivatedThisMachine = storedLicense && 
     storedLicense.licenseKey.toUpperCase() === licenseKey.toUpperCase() && 
     storedLicense.machineId === currentMachineId;
+  
+  // Always call Gumroad with increment_uses_count: false after the first activation so the count stays at 1 and is only used as a flag
   const incrementUsesCount = !alreadyActivatedThisMachine;
 
   // Attempt to load Gumroad config from package.json dynamically so developers can override without editing code
-  let productId = 'ILe-vFDDL-fYyDeKroOQXw==';
+  let productId = 'app3';
   let accessToken = '';
-  let usePermalink = false;
+  let usePermalink = true;
 
   try {
     const pkgPath = path.join(__dirname, '../package.json');
@@ -502,7 +508,7 @@ ipcMain.handle('validate-license', async (event, rawKey) => {
         return { ok: false, error: 'This license has been refunded and is no longer valid.' };
       }
 
-      const uses = data.uses || (data.purchase && data.purchase.uses) || 0;
+      const uses = (data.uses !== undefined ? data.uses : (data.purchase && data.purchase.uses)) || 0;
       const storedMachineId = storedLicense ? storedLicense.machineId : null;
 
       if (uses > 1 && storedMachineId !== currentMachineId) {
