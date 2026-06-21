@@ -337,6 +337,51 @@ ipcMain.handle('check-license', () => {
 });
 
 // Gumroad License verify
+const crypto = require('crypto');
+const os = require('os');
+
+function getMachineId() {
+  const raw = [
+    os.hostname(),
+    os.platform(),
+    os.arch(),
+    os.cpus()[0]?.model || '',
+    os.totalmem(),
+  ].join('|');
+  return crypto.createHash('sha256').update(raw).digest('hex');
+}
+
+const ENCRYPTION_KEY = crypto.createHash('sha256').update('OverdeskNexusLicenseSalt2026').digest();
+
+function writeEncryptedLicense(licenseKey, machineId) {
+  try {
+    const data = JSON.stringify({ licenseKey, machineId });
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
+    let encrypted = cipher.update(data, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    const licenseFilePath = path.join(app.getPath('userData'), 'license.enc');
+    fs.writeFileSync(licenseFilePath, JSON.stringify({ iv: iv.toString('hex'), data: encrypted }), 'utf8');
+  } catch (err) {
+    console.error('Error writing encrypted license:', err);
+  }
+}
+
+function readEncryptedLicense() {
+  try {
+    const licenseFilePath = path.join(app.getPath('userData'), 'license.enc');
+    if (!fs.existsSync(licenseFilePath)) return null;
+    const { iv, data } = JSON.parse(fs.readFileSync(licenseFilePath, 'utf8'));
+    const decipher = crypto.createDecipheriv('aes-256-cbc', ENCRYPTION_KEY, Buffer.from(iv, 'hex'));
+    let decrypted = decipher.update(data, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return JSON.parse(decrypted);
+  } catch (err) {
+    console.error('Error reading encrypted license:', err);
+    return null;
+  }
+}
+
 ipcMain.handle('validate-license', async (event, rawKey) => {
   const licenseKey = rawKey.trim();
   const normalizedKey = licenseKey.toUpperCase();
@@ -353,6 +398,13 @@ ipcMain.handle('validate-license', async (event, rawKey) => {
     writeConfig({ licenseValid: true, licenseKey });
     return { ok: true, test: true };
   }
+
+  const currentMachineId = getMachineId();
+  const storedLicense = readEncryptedLicense();
+  const alreadyActivatedThisMachine = storedLicense && 
+    storedLicense.licenseKey.toUpperCase() === licenseKey.toUpperCase() && 
+    storedLicense.machineId === currentMachineId;
+  const incrementUsesCount = !alreadyActivatedThisMachine;
 
   // Attempt to load Gumroad config from package.json dynamically so developers can override without editing code
   let productId = 'ILe-vFDDL-fYyDeKroOQXw==';
@@ -384,7 +436,7 @@ ipcMain.handle('validate-license', async (event, rawKey) => {
   try {
     const params = new URLSearchParams();
     params.append('license_key', licenseKey);
-    params.append('increment_uses_count', 'true');
+    params.append('increment_uses_count', incrementUsesCount ? 'true' : 'false');
     if (usePermalink) {
       params.append('product_permalink', productId);
     } else {
@@ -417,7 +469,7 @@ ipcMain.handle('validate-license', async (event, rawKey) => {
       // Fallback to JSON payload
       const requestBody = {
         license_key: licenseKey,
-        increment_uses_count: true
+        increment_uses_count: incrementUsesCount
       };
       if (usePermalink) {
         requestBody.product_permalink = productId;
@@ -441,14 +493,24 @@ ipcMain.handle('validate-license', async (event, rawKey) => {
       if (fallbackResponse.ok) {
         const fallbackData = await fallbackResponse.json();
         console.log('Gumroad JSON response:', fallbackResponse.status, fallbackData);
-        if (fallbackData.success && !fallbackData.uses_count_over_limit) {
-          writeConfig({ licenseValid: true, licenseKey });
-          return { ok: true };
-        }
-        data = fallbackData; // retain latest error message if still failed
+        data = fallbackData;
       }
-    } else {
-      if (data.success && !data.uses_count_over_limit) {
+    }
+
+    if (data && data.success && !data.uses_count_over_limit) {
+      if (data.purchase && data.purchase.refunded === true) {
+        return { ok: false, error: 'This license has been refunded and is no longer valid.' };
+      }
+
+      const uses = data.uses || (data.purchase && data.purchase.uses) || 0;
+      const storedMachineId = storedLicense ? storedLicense.machineId : null;
+
+      if (uses > 1 && storedMachineId !== currentMachineId) {
+        return { ok: false, error: 'This license key is already activated on another device. Contact support to transfer.' };
+      }
+
+      if (uses === 1 || storedMachineId === currentMachineId) {
+        writeEncryptedLicense(licenseKey, currentMachineId);
         writeConfig({ licenseValid: true, licenseKey });
         return { ok: true };
       }
