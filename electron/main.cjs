@@ -413,9 +413,9 @@ ipcMain.handle('validate-license', async (event, rawKey) => {
   const incrementUsesCount = !alreadyActivatedThisMachine;
 
   // Attempt to load Gumroad config from package.json dynamically so developers can override without editing code
-  let productId = 'app3';
+  let productId = 'ILe-vFDDL-fYyDeKroOQXw==';
   let accessToken = '';
-  let usePermalink = true;
+  let usePermalink = false;
 
   try {
     const pkgPath = path.join(__dirname, '../package.json');
@@ -522,12 +522,11 @@ ipcMain.handle('validate-license', async (event, rawKey) => {
       }
     }
 
-    const errorMessage = data && data.message ? data.message : `Gumroad verification failed (Status: ${response.status})`;
-    return { ok: false, error: errorMessage };
+    return { ok: false, error: "Invalid Key, get key from Gumroad" };
 
   } catch (err) {
     console.error('Gumroad fetch error:', err);
-    return { ok: false, error: err.message || 'Network error connecting to Gumroad.' };
+    return { ok: false, error: "Invalid Key, get key from Gumroad" };
   }
 });
 
