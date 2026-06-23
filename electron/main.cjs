@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -83,7 +83,8 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      backgroundThrottling: false // Ensure timers & audio keep running when window is minimized/hidden
     }
   };
 
@@ -541,6 +542,54 @@ ipcMain.on('set-ignore-mouse-events', (event, ignore, options) => {
 ipcMain.on('close-app', () => {
   if (mainWindow) {
     mainWindow.hide();
+  }
+});
+
+// Trigger Notification and Window Flashing (Rings when in Tray)
+ipcMain.on('trigger-alarm-notification', (event, title, body) => {
+  // 1. Show OS Native Notification so it displays toast and sounds
+  try {
+    if (Notification.isSupported()) {
+      const customIconPath = path.join(app.getPath('userData'), 'icon.png');
+      const packagedIconPath = path.join(__dirname, 'icon.png');
+      const iconPath = fs.existsSync(customIconPath) ? customIconPath : (fs.existsSync(packagedIconPath) ? packagedIconPath : undefined);
+
+      const notification = new Notification({
+        title: title || 'Economic Event Alarm',
+        body: body || 'High volatility economic news upcoming!',
+        silent: false, // Ensure system notification sound plays
+        icon: iconPath
+      });
+      notification.show();
+    }
+  } catch (err) {
+    console.error('Error showing native OS notification:', err);
+  }
+
+  // 2. Display balloon in system tray if available
+  try {
+    if (tray) {
+      tray.displayBalloon({
+        title: title || 'Economic Event Alarm',
+        content: body || 'High volatility economic news upcoming!'
+      });
+    }
+  } catch (err) {
+    console.error('Error displaying tray balloon:', err);
+  }
+
+  // 3. Flash taskbar frame/icon to grab user attention
+  try {
+    if (mainWindow) {
+      mainWindow.flashFrame(true);
+      setTimeout(() => {
+        if (mainWindow) {
+          mainWindow.flashFrame(false);
+        }
+      }, 6000);
+    }
+  } catch (err) {
+    console.error('Error flashing main window frame:', err);
   }
 });
 

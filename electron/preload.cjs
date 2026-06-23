@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkLicense: () => ipcRenderer.invoke('check-license'),
   validateLicense: (key) => ipcRenderer.invoke('validate-license', key),
   closeApp: () => ipcRenderer.send('close-app'),
+  triggerAlarmNotification: (title, body) => ipcRenderer.send('trigger-alarm-notification', title, body),
   setHeight: (height) => ipcRenderer.send('set-height', height),
   cardBounds: (bounds) => ipcRenderer.send('card-bounds', bounds),
   scaleStart: () => ipcRenderer.send('scale-start'),

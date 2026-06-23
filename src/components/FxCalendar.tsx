@@ -869,8 +869,17 @@ export default function FxCalendar({
 
   // Sound chimes 5 times beautifully paced
   const executeFiveStrikeAlarm = (eventTitle: string, profile: string) => {
-    setActiveAlertText(`ALERT: 5-MIN SLM FOR HIGH VOLATILITY EVENT: "${eventTitle}"`);
+    setActiveAlertText(`ALERT: EVENT PRE-ALERT FOR: "${eventTitle}"`);
     let strike = 0;
+    
+    // Trigger OS Native Notification and flash taskbar window in Electron
+    if (typeof window !== 'undefined' && (window as any).electronAPI && (window as any).electronAPI.triggerAlarmNotification) {
+      try {
+        (window as any).electronAPI.triggerAlarmNotification('Economic Event Pre-Alert!', eventTitle);
+      } catch (e) {
+        console.error('Failed to trigger native electron alarm notification:', e);
+      }
+    }
     
     const nextStrike = () => {
       if (strike >= 5) {
@@ -909,7 +918,16 @@ export default function FxCalendar({
       // ---- 5 MINUTES PRE-ALERT ----
       if (soundEnabled) {
         const upcoming5MinEvents = currentDynamicEvents.filter((e) => {
-          if (e.impact !== 'High') return false;
+          // Check if country/currency is active in current filters
+          const eventCountry = String(e.country || '').trim().toUpperCase();
+          const currenciesUpper = activeCurrencies.map(c => String(c).trim().toUpperCase());
+          if (!currenciesUpper.includes(eventCountry)) return false;
+
+          // Check if impact is active in current filters
+          let mappedImpact = String(e.impact || '').trim();
+          if (mappedImpact === 'Holiday') mappedImpact = 'Non-Econ';
+          const impactsLower = activeImpacts.map(i => String(i).trim().toLowerCase());
+          if (!impactsLower.includes(mappedImpact.toLowerCase())) return false;
           
           const eventId = `${e.country}-${e.date}-${e.title}`;
           if (customMutedEvents.includes(eventId)) return false;
@@ -924,7 +942,8 @@ export default function FxCalendar({
           const diffMs = eventTimeMs - currTimeMs;
           const diffSeconds = diffMs / 1000;
           
-          return diffSeconds >= 285 && diffSeconds <= 315;
+          // Must be in the upcoming 5 minutes (300 secs), but not have happened in the past
+          return diffSeconds >= -10 && diffSeconds <= 300;
         });
 
         if (upcoming5MinEvents.length > 0) {
@@ -943,7 +962,16 @@ export default function FxCalendar({
       // ---- 30 MINUTES PRE-ALERT ----
       if (soundEnabled30Min) {
         const upcoming30MinEvents = currentDynamicEvents.filter((e) => {
-          if (e.impact !== 'High') return false;
+          // Check if country/currency is active in current filters
+          const eventCountry = String(e.country || '').trim().toUpperCase();
+          const currenciesUpper = activeCurrencies.map(c => String(c).trim().toUpperCase());
+          if (!currenciesUpper.includes(eventCountry)) return false;
+
+          // Check if impact is active in current filters
+          let mappedImpact = String(e.impact || '').trim();
+          if (mappedImpact === 'Holiday') mappedImpact = 'Non-Econ';
+          const impactsLower = activeImpacts.map(i => String(i).trim().toLowerCase());
+          if (!impactsLower.includes(mappedImpact.toLowerCase())) return false;
           
           const eventId = `${e.country}-${e.date}-${e.title}`;
           if (customMutedEvents.includes(eventId)) return false;
@@ -958,7 +986,8 @@ export default function FxCalendar({
           const diffMs = eventTimeMs - currTimeMs;
           const diffSeconds = diffMs / 1000;
           
-          return diffSeconds >= 1785 && diffSeconds <= 1815;
+          // Must be in the upcoming 30 minutes (1800 secs), but not have happened in the past
+          return diffSeconds >= -10 && diffSeconds <= 1800;
         });
 
         if (upcoming30MinEvents.length > 0) {
@@ -976,7 +1005,7 @@ export default function FxCalendar({
     }, 5000); // Poll every 5 seconds exactly
 
     return () => clearInterval(pollInterval);
-  }, [simDate, soundProfile, soundEnabled, soundEnabled30Min, mutedKeywords, alertedTimestamps, alertedTimestamps30Min, customMutedEvents, customUnmutedEvents, eventsSource]);
+  }, [simDate, soundProfile, soundEnabled, soundEnabled30Min, mutedKeywords, alertedTimestamps, alertedTimestamps30Min, customMutedEvents, customUnmutedEvents, eventsSource, activeCurrencies, activeImpacts]);
 
   // Handle local persistence of settings
   useEffect(() => {
