@@ -911,98 +911,71 @@ export default function FxCalendar({
 
   // Synchronous economic calendar trigger poller - running precisely every 5 seconds
   useEffect(() => {
+    const alertedRef = { fiveMin: alertedTimestamps, thirtyMin: alertedTimestamps30Min };
+
     const pollInterval = setInterval(() => {
       const currTimeMs = simDate.getTime();
       const currentDynamicEvents = getDynamicEvents();
-      
+
+      const shouldAlert = (e: FxEvent) => {
+        const eventCountry = String(e.country || '').trim().toUpperCase();
+        const currenciesUpper = activeCurrencies.map(c => String(c).trim().toUpperCase());
+        if (!currenciesUpper.includes(eventCountry)) return false;
+
+        const eventId = `${e.country}-${e.date}-${e.title}`;
+        if (customMutedEvents.includes(eventId)) return false;
+
+        const isExplicitlyUnmuted = customUnmutedEvents.includes(eventId);
+        const isMuted = mutedKeywords.some(key => e.title.toLowerCase().includes(key.toLowerCase()));
+        if (isMuted && !isExplicitlyUnmuted) return false;
+
+        return true;
+      };
+
       // ---- 5 MINUTES PRE-ALERT ----
+      // Fires once when event is between 295 and 305 seconds away (exact 5-min window)
       if (soundEnabled) {
-        const upcoming5MinEvents = currentDynamicEvents.filter((e) => {
-          // Check if country/currency is active in current filters
-          const eventCountry = String(e.country || '').trim().toUpperCase();
-          const currenciesUpper = activeCurrencies.map(c => String(c).trim().toUpperCase());
-          if (!currenciesUpper.includes(eventCountry)) return false;
-
-          // Check if impact is active in current filters
-          let mappedImpact = String(e.impact || '').trim();
-          if (mappedImpact === 'Holiday') mappedImpact = 'Non-Econ';
-          const impactsLower = activeImpacts.map(i => String(i).trim().toLowerCase());
-          if (!impactsLower.includes(mappedImpact.toLowerCase())) return false;
-          
-          const eventId = `${e.country}-${e.date}-${e.title}`;
-          if (customMutedEvents.includes(eventId)) return false;
-
-          const isExplicitlyUnmuted = customUnmutedEvents.includes(eventId);
-          const isMuted = mutedKeywords.some((key) => 
-            e.title.toLowerCase().includes(key.toLowerCase())
-          );
-          if (isMuted && !isExplicitlyUnmuted) return false;
-
-          const eventTimeMs = new Date(e.date).getTime();
-          const diffMs = eventTimeMs - currTimeMs;
-          const diffSeconds = diffMs / 1000;
-          
-          // Must be in the upcoming 5 minutes (300 secs), but not have happened in the past
-          return diffSeconds >= -10 && diffSeconds <= 300;
+        const upcoming5MinEvents = currentDynamicEvents.filter(e => {
+          if (!shouldAlert(e)) return false;
+          const diffSeconds = (new Date(e.date).getTime() - currTimeMs) / 1000;
+          return diffSeconds >= 295 && diffSeconds <= 305;
         });
 
         if (upcoming5MinEvents.length > 0) {
           const representativeEvent = upcoming5MinEvents[0];
           const eventStamp = representativeEvent.date;
 
-          if (!alertedTimestamps.includes(eventStamp)) {
-            setAlertedTimestamps((prev) => [...prev, eventStamp]);
-            
-            const consolidatedTitles = upcoming5MinEvents.map((ue) => `[${ue.country}] ${ue.title}`).join(', ');
-            executeFiveStrikeAlarm(`[5m Alarm] ${consolidatedTitles}`, soundProfile);
+          if (!alertedRef.fiveMin.includes(eventStamp)) {
+            alertedRef.fiveMin = [...alertedRef.fiveMin, eventStamp];
+            setAlertedTimestamps(alertedRef.fiveMin);
+            const consolidatedTitles = upcoming5MinEvents.map(ue => `[${ue.country}] ${ue.title}`).join(', ');
+            executeFiveStrikeAlarm(`[5m] ${consolidatedTitles}`, soundProfile);
           }
         }
       }
 
       // ---- 30 MINUTES PRE-ALERT ----
+      // Fires once when event is between 1795 and 1805 seconds away (exact 30-min window)
       if (soundEnabled30Min) {
-        const upcoming30MinEvents = currentDynamicEvents.filter((e) => {
-          // Check if country/currency is active in current filters
-          const eventCountry = String(e.country || '').trim().toUpperCase();
-          const currenciesUpper = activeCurrencies.map(c => String(c).trim().toUpperCase());
-          if (!currenciesUpper.includes(eventCountry)) return false;
-
-          // Check if impact is active in current filters
-          let mappedImpact = String(e.impact || '').trim();
-          if (mappedImpact === 'Holiday') mappedImpact = 'Non-Econ';
-          const impactsLower = activeImpacts.map(i => String(i).trim().toLowerCase());
-          if (!impactsLower.includes(mappedImpact.toLowerCase())) return false;
-          
-          const eventId = `${e.country}-${e.date}-${e.title}`;
-          if (customMutedEvents.includes(eventId)) return false;
-
-          const isExplicitlyUnmuted = customUnmutedEvents.includes(eventId);
-          const isMuted = mutedKeywords.some((key) => 
-            e.title.toLowerCase().includes(key.toLowerCase())
-          );
-          if (isMuted && !isExplicitlyUnmuted) return false;
-
-          const eventTimeMs = new Date(e.date).getTime();
-          const diffMs = eventTimeMs - currTimeMs;
-          const diffSeconds = diffMs / 1000;
-          
-          // Must be in the upcoming 30 minutes (1800 secs), but not have happened in the past
-          return diffSeconds >= -10 && diffSeconds <= 1800;
+        const upcoming30MinEvents = currentDynamicEvents.filter(e => {
+          if (!shouldAlert(e)) return false;
+          const diffSeconds = (new Date(e.date).getTime() - currTimeMs) / 1000;
+          return diffSeconds >= 1795 && diffSeconds <= 1805;
         });
 
         if (upcoming30MinEvents.length > 0) {
           const representativeEvent = upcoming30MinEvents[0];
           const eventStamp = representativeEvent.date;
 
-          if (!alertedTimestamps30Min.includes(eventStamp)) {
-            setAlertedTimestamps30Min((prev) => [...prev, eventStamp]);
-            
-            const consolidatedTitles = upcoming30MinEvents.map((ue) => `[${ue.country}] ${ue.title}`).join(', ');
-            executeFiveStrikeAlarm(`[30m Alarm] ${consolidatedTitles}`, soundProfile);
+          if (!alertedRef.thirtyMin.includes(eventStamp)) {
+            alertedRef.thirtyMin = [...alertedRef.thirtyMin, eventStamp];
+            setAlertedTimestamps30Min(alertedRef.thirtyMin);
+            const consolidatedTitles = upcoming30MinEvents.map(ue => `[${ue.country}] ${ue.title}`).join(', ');
+            executeFiveStrikeAlarm(`[30m] ${consolidatedTitles}`, soundProfile);
           }
         }
       }
-    }, 5000); // Poll every 5 seconds exactly
+    }, 5000);
 
     return () => clearInterval(pollInterval);
   }, [simDate, soundProfile, soundEnabled, soundEnabled30Min, mutedKeywords, alertedTimestamps, alertedTimestamps30Min, customMutedEvents, customUnmutedEvents, eventsSource, activeCurrencies, activeImpacts]);
@@ -2370,7 +2343,7 @@ export default function FxCalendar({
                 {/* Toggle switch: 5 Min before alerts */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '11.5px', fontWeight: '600', color: isLight ? '#0f172a' : '#ffffff' }}>
-                    Trigger 5 min before alerts
+                    Trigger alerts 5 min before all events
                   </span>
                   <button
                     onClick={() => setSoundEnabled(!soundEnabled)}
@@ -2409,7 +2382,7 @@ export default function FxCalendar({
                 {/* Toggle switch: 30 Min before alerts */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '11.5px', fontWeight: '600', color: isLight ? '#0f172a' : '#ffffff' }}>
-                    Trigger 30 min before alerts
+                    Trigger alerts 30 min before all events
                   </span>
                   <button
                     onClick={() => setSoundEnabled30Min(!soundEnabled30Min)}
