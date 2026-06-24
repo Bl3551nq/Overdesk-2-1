@@ -120,10 +120,23 @@ export const playSynthSound = (profile: string) => {
   }
 };
 
-const playFallbackSynth = (profile: string) => {
+let sharedAudioContext: AudioContext | null = null;
+const getSharedAudioContext = (): AudioContext | null => {
+  if (typeof window === 'undefined') return null;
   const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-  if (!AudioContextClass) return;
-  const ctx = new AudioContextClass();
+  if (!AudioContextClass) return null;
+  if (!sharedAudioContext) {
+    sharedAudioContext = new AudioContextClass();
+  }
+  if (sharedAudioContext && sharedAudioContext.state === 'suspended') {
+    sharedAudioContext.resume().catch(() => {});
+  }
+  return sharedAudioContext;
+};
+
+const playFallbackSynth = (profile: string) => {
+  const ctx = getSharedAudioContext();
+  if (!ctx) return;
   
   const playCrystallineDeskBell = (timeOffset = 0, volume = 0.5) => {
     const osc1 = ctx.createOscillator();
@@ -843,8 +856,6 @@ export default function FxCalendar({
   // Play chimes (either synthesized on-the-fly, or using direct static fallback mp3 urls)
   const triggerAlarmSound = (profileTarget: string) => {
     try {
-      if (!soundEnabled) return;
-      
       if (profileTarget.startsWith('mp3_')) {
         const realProfile = profileTarget.replace('mp3_', '');
         let url = "https://raw.githubusercontent.com/Bl3551nq/bell-sound/main/school_bell.mp3";
@@ -876,8 +887,8 @@ export default function FxCalendar({
     }
   };
 
-  // Sound chimes 5 times beautifully paced
-  const executeFiveStrikeAlarm = (eventTitle: string, profile: string) => {
+  // Sound chimes 3 times beautifully paced
+  const executeThreeStrikeAlarm = (eventTitle: string, profile: string) => {
     setActiveAlertText(`ALERT: EVENT PRE-ALERT FOR: "${eventTitle}"`);
     let strike = 0;
     
@@ -891,7 +902,7 @@ export default function FxCalendar({
     }
     
     const nextStrike = () => {
-      if (strike >= 5) {
+      if (strike >= 3) {
         setTimeout(() => setActiveAlertText(null), 3000);
         return;
       }
@@ -967,7 +978,7 @@ export default function FxCalendar({
           if (!fiveMinAlerted.has(key)) {
             fiveMinAlerted.add(key);
             updated5 = true;
-            executeFiveStrikeAlarm(`[5m] [${e.country}] ${e.title}`, soundProfile);
+            executeThreeStrikeAlarm(`[5m] [${e.country}] ${e.title}`, soundProfile);
           }
         }
 
@@ -977,7 +988,7 @@ export default function FxCalendar({
           if (!thirtyMinAlerted.has(key)) {
             thirtyMinAlerted.add(key);
             updated30 = true;
-            executeFiveStrikeAlarm(`[30m] [${e.country}] ${e.title}`, soundProfile);
+            executeThreeStrikeAlarm(`[30m] [${e.country}] ${e.title}`, soundProfile);
           }
         }
       });
