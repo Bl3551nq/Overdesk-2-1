@@ -842,28 +842,37 @@ export default function FxCalendar({
 
   // Play chimes (either synthesized on-the-fly, or using direct static fallback mp3 urls)
   const triggerAlarmSound = (profileTarget: string) => {
-    if (!soundEnabled) return;
-    
-    if (profileTarget.startsWith('mp3_')) {
-      const realProfile = profileTarget.replace('mp3_', '');
-      let url = "https://raw.githubusercontent.com/Bl3551nq/bell-sound/main/school_bell.mp3";
-      if (realProfile === 'princess') {
-        url = "https://raw.githubusercontent.com/Bl3551nq/bell-sound/main/princess_bell.mp3";
-      } else if (realProfile === 'pokemon') {
-        url = "https://raw.githubusercontent.com/Bl3551nq/bell-sound/main/pokemon_colo_heal.mp3";
-      } else if (realProfile === 'desk') {
-        // Fallback or direct happy bell
-        url = "https://raw.githubusercontent.com/Bl3551nq/bell-sound/main/princess_bell.mp3"; 
-      }
+    try {
+      if (!soundEnabled) return;
       
-      const audio = new Audio(url);
-      audio.volume = 0.75;
-      audio.play().catch(() => {
-        // Fallback to synth if play blocked or offline
-        playSynthSound(realProfile);
-      });
-    } else {
-      playSynthSound(profileTarget);
+      if (profileTarget.startsWith('mp3_')) {
+        const realProfile = profileTarget.replace('mp3_', '');
+        let url = "https://raw.githubusercontent.com/Bl3551nq/bell-sound/main/school_bell.mp3";
+        if (realProfile === 'princess') {
+          url = "https://raw.githubusercontent.com/Bl3551nq/bell-sound/main/princess_bell.mp3";
+        } else if (realProfile === 'pokemon') {
+          url = "https://raw.githubusercontent.com/Bl3551nq/bell-sound/main/pokemon_colo_heal.mp3";
+        } else if (realProfile === 'desk') {
+          // Fallback or direct happy bell
+          url = "https://raw.githubusercontent.com/Bl3551nq/bell-sound/main/princess_bell.mp3"; 
+        }
+        
+        const audio = new Audio(url);
+        audio.volume = 0.75;
+        audio.play().catch(() => {
+          // Fallback to synth if play blocked or offline
+          playSynthSound(realProfile);
+        });
+      } else {
+        playSynthSound(profileTarget);
+      }
+    } catch (err) {
+      console.error("Failed to play alarm sound in triggerAlarmSound:", err);
+      try {
+        playSynthSound(profileTarget);
+      } catch (innerErr) {
+        console.error("Double fallback failed for playSynthSound:", innerErr);
+      }
     }
   };
 
@@ -911,71 +920,63 @@ export default function FxCalendar({
 
   // Synchronous economic calendar trigger poller - running precisely every 5 seconds
   useEffect(() => {
-    const alertedRef = { fiveMin: alertedTimestamps, thirtyMin: alertedTimestamps30Min };
+    const fiveMinAlerted = new Set<string>(alertedTimestamps);
+    const thirtyMinAlerted = new Set<string>(alertedTimestamps30Min);
+
+    const currentDynamicEvents = eventsSource;
+
+    const shouldAlert = (e: FxEvent): boolean => {
+      const eventCountry = String(e.country || '').trim().toUpperCase();
+      const currenciesUpper = activeCurrencies.map(c => String(c).trim().toUpperCase());
+      if (!currenciesUpper.includes(eventCountry)) return false;
+
+      const eventId = `${e.country}-${e.date}-${e.title}`;
+      if (customMutedEvents.includes(eventId)) return false;
+
+      const isExplicitlyUnmuted = customUnmutedEvents.includes(eventId);
+      const isMuted = mutedKeywords.some(key =>
+        e.title.toLowerCase().includes(key.toLowerCase())
+      );
+      if (isMuted && !isExplicitlyUnmuted) return false;
+
+      return true;
+    };
 
     const pollInterval = setInterval(() => {
-      const currTimeMs = simDate.getTime();
-      const currentDynamicEvents = getDynamicEvents();
+      if (!eventsSource || eventsSource.length === 0) return;
 
-      const shouldAlert = (e: FxEvent) => {
-        const eventCountry = String(e.country || '').trim().toUpperCase();
-        const currenciesUpper = activeCurrencies.map(c => String(c).trim().toUpperCase());
-        if (!currenciesUpper.includes(eventCountry)) return false;
+      const now = new Date();
+      const nowMs = now.getTime();
 
-        const eventId = `${e.country}-${e.date}-${e.title}`;
-        if (customMutedEvents.includes(eventId)) return false;
+      currentDynamicEvents.forEach(e => {
+        if (!shouldAlert(e)) return;
 
-        const isExplicitlyUnmuted = customUnmutedEvents.includes(eventId);
-        const isMuted = mutedKeywords.some(key => e.title.toLowerCase().includes(key.toLowerCase()));
-        if (isMuted && !isExplicitlyUnmuted) return false;
+        // Parse event time directly from the ISO string to avoid timezone issues
+        const eventMs = new Date(e.date).getTime();
+        const diffSeconds = (eventMs - nowMs) / 1000;
+        const eventStamp = `${e.country}-${e.date}-${e.title}`;
 
-        return true;
-      };
-
-      // ---- 5 MINUTES PRE-ALERT ----
-      // Fires once when event is between 295 and 305 seconds away (exact 5-min window)
-      if (soundEnabled) {
-        const upcoming5MinEvents = currentDynamicEvents.filter(e => {
-          if (!shouldAlert(e)) return false;
-          const diffSeconds = (new Date(e.date).getTime() - currTimeMs) / 1000;
-          return diffSeconds >= 295 && diffSeconds <= 305;
-        });
-
-        if (upcoming5MinEvents.length > 0) {
-          const representativeEvent = upcoming5MinEvents[0];
-          const eventStamp = representativeEvent.date;
-
-          if (!alertedRef.fiveMin.includes(eventStamp)) {
-            alertedRef.fiveMin = [...alertedRef.fiveMin, eventStamp];
-            setAlertedTimestamps(alertedRef.fiveMin);
-            const consolidatedTitles = upcoming5MinEvents.map(ue => `[${ue.country}] ${ue.title}`).join(', ');
-            executeFiveStrikeAlarm(`[5m] ${consolidatedTitles}`, soundProfile);
+        // 5 min alert — window 270 to 330 seconds
+        if (soundEnabled && diffSeconds >= 270 && diffSeconds <= 330) {
+          const key = `5m-${eventStamp}`;
+          if (!fiveMinAlerted.has(key)) {
+            fiveMinAlerted.add(key);
+            setAlertedTimestamps(prev => [...prev, key]);
+            executeFiveStrikeAlarm(`[5m] [${e.country}] ${e.title}`, soundProfile);
           }
         }
-      }
 
-      // ---- 30 MINUTES PRE-ALERT ----
-      // Fires once when event is between 1795 and 1805 seconds away (exact 30-min window)
-      if (soundEnabled30Min) {
-        const upcoming30MinEvents = currentDynamicEvents.filter(e => {
-          if (!shouldAlert(e)) return false;
-          const diffSeconds = (new Date(e.date).getTime() - currTimeMs) / 1000;
-          return diffSeconds >= 1795 && diffSeconds <= 1805;
-        });
-
-        if (upcoming30MinEvents.length > 0) {
-          const representativeEvent = upcoming30MinEvents[0];
-          const eventStamp = representativeEvent.date;
-
-          if (!alertedRef.thirtyMin.includes(eventStamp)) {
-            alertedRef.thirtyMin = [...alertedRef.thirtyMin, eventStamp];
-            setAlertedTimestamps30Min(alertedRef.thirtyMin);
-            const consolidatedTitles = upcoming30MinEvents.map(ue => `[${ue.country}] ${ue.title}`).join(', ');
-            executeFiveStrikeAlarm(`[30m] ${consolidatedTitles}`, soundProfile);
+        // 30 min alert — window 1770 to 1830 seconds
+        if (soundEnabled30Min && diffSeconds >= 1770 && diffSeconds <= 1830) {
+          const key = `30m-${eventStamp}`;
+          if (!thirtyMinAlerted.has(key)) {
+            thirtyMinAlerted.add(key);
+            setAlertedTimestamps30Min(prev => [...prev, key]);
+            executeFiveStrikeAlarm(`[30m] [${e.country}] ${e.title}`, soundProfile);
           }
         }
-      }
-    }, 5000);
+      });
+    }, 3000);
 
     return () => clearInterval(pollInterval);
   }, [simDate, soundProfile, soundEnabled, soundEnabled30Min, mutedKeywords, alertedTimestamps, alertedTimestamps30Min, customMutedEvents, customUnmutedEvents, eventsSource, activeCurrencies, activeImpacts]);
