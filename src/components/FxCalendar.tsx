@@ -918,71 +918,80 @@ export default function FxCalendar({
     };
   }, [simActive, simSpeed]);
 
-  // Synchronous economic calendar trigger poller - running precisely whenever simDate updates
+  const simDateRef = useRef<Date>(simDate);
   useEffect(() => {
-    if (!eventsSource || eventsSource.length === 0) return;
+    simDateRef.current = simDate;
+  }, [simDate]);
 
-    const fiveMinAlerted = new Set<string>(alertedTimestamps);
-    const thirtyMinAlerted = new Set<string>(alertedTimestamps30Min);
-    const currentDynamicEvents = eventsSource;
-    const nowMs = simDate.getTime();
+  // Synchronous economic calendar trigger poller - running precisely every 2 seconds
+  useEffect(() => {
+    const pollInterval = setInterval(() => {
+      if (!eventsSource || eventsSource.length === 0) return;
 
-    const shouldAlert = (e: FxEvent): boolean => {
-      const eventCountry = String(e.country || '').trim().toUpperCase();
-      const currenciesUpper = activeCurrencies.map(c => String(c).trim().toUpperCase());
-      if (!currenciesUpper.includes(eventCountry)) return false;
+      const fiveMinAlerted = new Set<string>(alertedTimestamps);
+      const thirtyMinAlerted = new Set<string>(alertedTimestamps30Min);
+      const currentDynamicEvents = eventsSource;
+      const nowMs = simDateRef.current.getTime();
 
-      const eventId = `${e.country}-${e.date}-${e.title}`;
-      if (customMutedEvents.includes(eventId)) return false;
+      const shouldAlert = (e: FxEvent): boolean => {
+        const eventCountry = String(e.country || '').trim().toUpperCase();
+        const currenciesUpper = activeCurrencies.map(c => String(c).trim().toUpperCase());
+        if (!currenciesUpper.includes(eventCountry)) return false;
 
-      const isExplicitlyUnmuted = customUnmutedEvents.includes(eventId);
-      const isMuted = mutedKeywords.some(key =>
-        e.title.toLowerCase().includes(key.toLowerCase())
-      );
-      if (isMuted && !isExplicitlyUnmuted) return false;
+        const eventId = `${e.country}-${e.date}-${e.title}`;
+        if (customMutedEvents.includes(eventId)) return false;
 
-      return true;
-    };
+        const isExplicitlyUnmuted = customUnmutedEvents.includes(eventId);
+        const isMuted = mutedKeywords.some(key =>
+          e.title.toLowerCase().includes(key.toLowerCase())
+        );
+        if (isMuted && !isExplicitlyUnmuted) return false;
 
-    let updated5 = false;
-    let updated30 = false;
+        return true;
+      };
 
-    currentDynamicEvents.forEach(e => {
-      if (!shouldAlert(e)) return;
+      let updated5 = false;
+      let updated30 = false;
 
-      // Parse event time directly from the ISO string to avoid timezone issues
-      const eventMs = new Date(e.date).getTime();
-      const diffSeconds = (eventMs - nowMs) / 1000;
-      const eventStamp = `${e.country}-${e.date}-${e.title}`;
+      currentDynamicEvents.forEach(e => {
+        if (!shouldAlert(e)) return;
 
-      // 5 min alert — window 270 to 330 seconds
-      if (soundEnabled && diffSeconds >= 270 && diffSeconds <= 330) {
-        const key = `5m-${eventStamp}`;
-        if (!fiveMinAlerted.has(key)) {
-          fiveMinAlerted.add(key);
-          updated5 = true;
-          executeFiveStrikeAlarm(`[5m] [${e.country}] ${e.title}`, soundProfile);
+        // Parse event time directly from the ISO string to avoid timezone issues
+        const eventMs = new Date(e.date).getTime();
+        const diffSeconds = (eventMs - nowMs) / 1000;
+        const eventStamp = `${e.country}-${e.date}-${e.title}`;
+
+        // 5 min alert — window 270 to 330 seconds
+        if (soundEnabled && diffSeconds >= 270 && diffSeconds <= 330) {
+          const key = `5m-${eventStamp}`;
+          if (!fiveMinAlerted.has(key)) {
+            fiveMinAlerted.add(key);
+            updated5 = true;
+            executeFiveStrikeAlarm(`[5m] [${e.country}] ${e.title}`, soundProfile);
+          }
         }
-      }
 
-      // 30 min alert — window 1770 to 1830 seconds
-      if (soundEnabled30Min && diffSeconds >= 1770 && diffSeconds <= 1830) {
-        const key = `30m-${eventStamp}`;
-        if (!thirtyMinAlerted.has(key)) {
-          thirtyMinAlerted.add(key);
-          updated30 = true;
-          executeFiveStrikeAlarm(`[30m] [${e.country}] ${e.title}`, soundProfile);
+        // 30 min alert — window 1770 to 1830 seconds
+        if (soundEnabled30Min && diffSeconds >= 1770 && diffSeconds <= 1830) {
+          const key = `30m-${eventStamp}`;
+          if (!thirtyMinAlerted.has(key)) {
+            thirtyMinAlerted.add(key);
+            updated30 = true;
+            executeFiveStrikeAlarm(`[30m] [${e.country}] ${e.title}`, soundProfile);
+          }
         }
-      }
-    });
+      });
 
-    if (updated5) {
-      setAlertedTimestamps(Array.from(fiveMinAlerted));
-    }
-    if (updated30) {
-      setAlertedTimestamps30Min(Array.from(thirtyMinAlerted));
-    }
-  }, [simDate, soundProfile, soundEnabled, soundEnabled30Min, mutedKeywords, alertedTimestamps, alertedTimestamps30Min, customMutedEvents, customUnmutedEvents, eventsSource, activeCurrencies, activeImpacts]);
+      if (updated5) {
+        setAlertedTimestamps(Array.from(fiveMinAlerted));
+      }
+      if (updated30) {
+        setAlertedTimestamps30Min(Array.from(thirtyMinAlerted));
+      }
+    }, 2000);
+
+    return () => clearInterval(pollInterval);
+  }, [soundProfile, soundEnabled, soundEnabled30Min, mutedKeywords, alertedTimestamps, alertedTimestamps30Min, customMutedEvents, customUnmutedEvents, eventsSource, activeCurrencies, activeImpacts]);
 
   // Handle local persistence of settings
   useEffect(() => {
