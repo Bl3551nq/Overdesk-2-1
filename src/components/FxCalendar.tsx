@@ -887,30 +887,35 @@ export default function FxCalendar({
     }
   };
 
-  // Sound chimes 3 times beautifully paced
-  const executeThreeStrikeAlarm = (eventTitle: string, profile: string) => {
-    setActiveAlertText(`ALERT: EVENT PRE-ALERT FOR: "${eventTitle}"`);
+  const isAlarmRunningRef = useRef<boolean>(false);
+
+  const executeFiveStrikeAlarm = (eventTitle: string, profile: string) => {
+    if (isAlarmRunningRef.current) return; // Prevent double firing
+    isAlarmRunningRef.current = true;
+
+    setActiveAlertText(`🚨 PRE-ALERT: "${eventTitle}"`);
+
     let strike = 0;
-    
-    // Trigger OS Native Notification and flash taskbar window in Electron
-    if (typeof window !== 'undefined' && (window as any).electronAPI && (window as any).electronAPI.triggerAlarmNotification) {
-      try {
-        (window as any).electronAPI.triggerAlarmNotification('Economic Event Pre-Alert!', eventTitle);
-      } catch (e) {
-        console.error('Failed to trigger native electron alarm notification:', e);
-      }
-    }
-    
     const nextStrike = () => {
-      if (strike >= 3) {
-        setTimeout(() => setActiveAlertText(null), 3000);
+      if (strike >= 5) {
+        setTimeout(() => {
+          setActiveAlertText(null);
+          isAlarmRunningRef.current = false;
+        }, 3000);
         return;
       }
       triggerAlarmSound(profile);
       strike++;
-      setTimeout(nextStrike, 1100); // 1.1s spacing
+      setTimeout(nextStrike, 1100);
     };
     nextStrike();
+
+    // Trigger Electron native notification if available
+    if (typeof window !== 'undefined' && (window as any).electronAPI?.triggerAlarmNotification) {
+      try {
+        (window as any).electronAPI.triggerAlarmNotification('Economic Event Pre-Alert!', eventTitle);
+      } catch (e) {}
+    }
   };
 
   // Clock updating in real-time or simulated multiplier
@@ -972,23 +977,23 @@ export default function FxCalendar({
         const diffSeconds = (eventMs - nowMs) / 1000;
         const eventStamp = `${e.country}-${e.date}-${e.title}`;
 
-        // 5 min alert — window 270 to 330 seconds
-        if (soundEnabled && diffSeconds >= 270 && diffSeconds <= 330) {
+        // 5 min alert — window 290 to 310 seconds
+        if (soundEnabled && diffSeconds >= 290 && diffSeconds <= 310) {
           const key = `5m-${eventStamp}`;
           if (!fiveMinAlerted.has(key)) {
             fiveMinAlerted.add(key);
             updated5 = true;
-            executeThreeStrikeAlarm(`[5m] [${e.country}] ${e.title}`, soundProfile);
+            executeFiveStrikeAlarm(`[5m] [${e.country}] ${e.title}`, soundProfile);
           }
         }
 
-        // 30 min alert — window 1770 to 1830 seconds
-        if (soundEnabled30Min && diffSeconds >= 1770 && diffSeconds <= 1830) {
+        // 30 min alert — window 1790 to 1810 seconds
+        if (soundEnabled30Min && diffSeconds >= 1790 && diffSeconds <= 1810) {
           const key = `30m-${eventStamp}`;
           if (!thirtyMinAlerted.has(key)) {
             thirtyMinAlerted.add(key);
             updated30 = true;
-            executeThreeStrikeAlarm(`[30m] [${e.country}] ${e.title}`, soundProfile);
+            executeFiveStrikeAlarm(`[30m] [${e.country}] ${e.title}`, soundProfile);
           }
         }
       });
