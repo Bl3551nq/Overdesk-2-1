@@ -1,7 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
-import BorderGlow from './components/BorderGlow';
-const overdeskLogo = 'https://raw.githubusercontent.com/Bl3551nq/Overdesk-Logos/refs/heads/main/Overdesk%20Nexus.svg';
+import overdeskLogo from './logo.svg';
 import FxCalendar, { playSynthSound } from './components/FxCalendar';
+import { MinimizedReminderView } from './components/MinimizedReminderView';
+import { Glass } from './components/Glass';
+import GooeyNav, { triggerGooeyParticles } from './components/GooeyNav';
+
+import wallpaperGokuBack from './assets/images/goku_back_focus_1785507323174.jpg';
+import wallpaperBullBear from './assets/images/bull_bear_chart_1785507336627.jpg';
+import wallpaperNeonCandles from './assets/images/neon_candlesticks_1785507347931.jpg';
+import wallpaperCyberTunnel from './assets/images/cyber_trading_tunnel_1785507362848.jpg';
+import wallpaperAnimeDiscipline from './assets/images/anime_discipline_1785507376413.jpg';
+import wallpaperGokuSilhouette from './assets/images/goku_silhouette_focus_1785507390062.jpg';
+
+const PRESET_WALLPAPERS = [
+  { id: 'goku_back_focus', name: 'Goku Focus Back', url: wallpaperGokuBack },
+  { id: 'bull_bear_chart', name: 'Bull & Bear Market', url: wallpaperBullBear },
+  { id: 'neon_candlesticks', name: 'Neon Candlesticks', url: wallpaperNeonCandles },
+  { id: 'cyber_trading_tunnel', name: 'Cyber Trading Tunnel', url: wallpaperCyberTunnel },
+  { id: 'anime_discipline', name: 'Discipline Pushups', url: wallpaperAnimeDiscipline },
+  { id: 'goku_silhouette_focus', name: 'Goku Focus Front', url: wallpaperGokuSilhouette },
+];
 
 // Declaration to access global Electron API from preload script
 declare global {
@@ -22,163 +40,67 @@ declare global {
   }
 }
 
-// Icon Definitions Dictionary
+// Icon Definitions Dictionary (Forex Trading Icons)
 const ICON_LIBRARY: Record<string, { label: string; svg: React.ReactNode }> = {
-  target: {
-    label: 'Target',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
-        <circle cx="12" cy="12" r="8.5" />
-        <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none" />
-        <line x1="12" y1="2" x2="12" y2="6" />
-        <line x1="12" y1="18" x2="12" y2="22" />
-        <line x1="2" y1="12" x2="6" y2="12" />
-        <line x1="18" y1="12" x2="22" y2="12" />
-      </svg>
-    ),
-  },
-  candle: {
-    label: 'Candles',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="currentColor">
-        <rect x="4.2" y="4" width="1.3" height="4" rx="0.6" />
-        <rect x="3" y="8" width="3.8" height="6" rx="0.8" />
-        <rect x="4.2" y="14" width="1.3" height="3" rx="0.6" />
-        <rect x="10.4" y="2" width="1.3" height="5" rx="0.6" />
-        <rect x="9.2" y="7" width="3.8" height="8" rx="0.8" />
-        <rect x="10.4" y="15" width="1.3" height="4" rx="0.6" />
-        <rect x="16.6" y="6" width="1.3" height="4" rx="0.6" />
-        <rect x="15.4" y="10" width="3.8" height="5" rx="0.8" />
-        <rect x="16.6" y="15" width="1.3" height="4" rx="0.6" />
-      </svg>
-    ),
-  },
-  dollar: {
-    label: 'Dollar',
+  // --- 1. Market Analysis ---
+  candlestick: {
+    label: 'Candle',
     svg: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="12" y1="1" x2="12" y2="23" />
-        <path d="M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6" />
-      </svg>
-    ),
-  },
-  shield: {
-    label: 'DND',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2L4 6v6c0 5.25 3.5 9.74 8 11 4.5-1.26 8-5.75 8-11V6L12 2z" opacity="0.9" />
-        <rect x="9.2" y="9" width="2" height="6" rx="0.6" fill="#fff" opacity="0.85" />
-        <rect x="12.8" y="9" width="2" height="6" rx="0.6" fill="#fff" opacity="0.85" />
-      </svg>
-    ),
-  },
-  bell: {
-    label: 'Alerts',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-      </svg>
-    ),
-  },
-  trending_up: {
-    label: 'Bull',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
-        <polyline points="17 6 23 6 23 12" />
-      </svg>
-    ),
-  },
-  trending_dn: {
-    label: 'Bear',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="23 18 13.5 8.5 8.5 13.5 1 6" />
-        <polyline points="17 18 23 18 23 12" />
-      </svg>
-    ),
-  },
-  activity: {
-    label: 'Signal',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+        <line x1="6" y1="3" x2="6" y2="21" />
+        <rect x="4" y="7" width="4" height="9" rx="1" fill="currentColor" fillOpacity="0.25" />
+        <line x1="18" y1="3" x2="18" y2="21" />
+        <rect x="16" y="5" width="4" height="8" rx="1" fill="currentColor" fillOpacity="0.25" />
       </svg>
     ),
   },
   bar_chart: {
-    label: 'Bars',
+    label: 'Bar Chart',
     svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-        <line x1="18" y1="20" x2="18" y2="10" />
-        <line x1="12" y1="20" x2="12" y2="4" />
-        <line x1="6" y1="20" x2="6" y2="14" />
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="7" y1="3" x2="7" y2="21" />
+        <line x1="4" y1="16" x2="7" y2="16" />
+        <line x1="7" y1="7" x2="10" y2="7" />
+        <line x1="17" y1="3" x2="17" y2="21" />
+        <line x1="14" y1="18" x2="17" y2="18" />
+        <line x1="17" y1="9" x2="20" y2="9" />
+      </svg>
+    ),
+  },
+  trendline: {
+    label: 'Trend',
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="3 17 9 11 13 15 21 7" />
+        <polyline points="16 7 21 7 21 12" />
+        <line x1="3" y1="20" x2="21" y2="20" />
+      </svg>
+    ),
+  },
+  fibonacci: {
+    label: 'Fib',
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="3" y1="5" x2="21" y2="5" />
+        <line x1="3" y1="9" x2="21" y2="9" />
+        <line x1="3" y1="13" x2="21" y2="13" />
+        <line x1="3" y1="19" x2="21" y2="19" />
+        <circle cx="17" cy="9" r="1.5" fill="currentColor" />
+        <circle cx="8" cy="13" r="1.5" fill="currentColor" />
+      </svg>
+    ),
+  },
+  technical_indicators: {
+    label: 'Ind',
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 12c2-4 5-4 7 0s5 4 7 0 5-4 6 0" />
+        <path d="M2 16c3-2 6-2 8 0s5 2 8 0" />
         <line x1="2" y1="20" x2="22" y2="20" />
       </svg>
     ),
   },
-  line_chart: {
-    label: 'Line',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="4 17 8 11 12 14 16 7 20 10" />
-        <line x1="4" y1="21" x2="20" y2="21" />
-      </svg>
-    ),
-  },
-  percent: {
-    label: 'Percent',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-        <line x1="19" y1="5" x2="5" y2="19" />
-        <circle cx="6.5" cy="6.5" r="2.5" />
-        <circle cx="17.5" cy="17.5" r="2.5" />
-      </svg>
-    ),
-  },
-  pie: {
-    label: 'Portfolio',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
-        <path d="M22 12A10 10 0 0 0 12 2v10z" />
-      </svg>
-    ),
-  },
-  bitcoin: {
-    label: 'Crypto',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M7 7h6a3 3 0 0 1 0 6H7V7z" />
-        <path d="M7 13h6.5a3 3 0 0 1 0 6H7V13z" />
-        <line x1="9" y1="4" x2="9" y2="7" />
-        <line x1="14" y1="4" x2="14" y2="7" />
-        <line x1="9" y1="19" x2="9" y2="22" />
-        <line x1="14" y1="19" x2="14" y2="22" />
-      </svg>
-    ),
-  },
-  wallet: {
-    label: 'Wallet',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
-        <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
-        <path d="M18 12a2 2 0 0 0 0 4h4v-4h-4z" />
-      </svg>
-    ),
-  },
-  clock: {
-    label: 'Clock',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-        <circle cx="12" cy="12" r="9" />
-        <polyline points="12 7 12 12 15.5 15.5" />
-      </svg>
-    ),
-  },
-  calendar: {
+  economic_calendar: {
     label: 'Calendar',
     svg: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -186,209 +108,265 @@ const ICON_LIBRARY: Record<string, { label: string; svg: React.ReactNode }> = {
         <line x1="16" y1="2" x2="16" y2="6" />
         <line x1="8" y1="2" x2="8" y2="6" />
         <line x1="3" y1="10" x2="21" y2="10" />
-      </svg>
-    ),
-  },
-  lock: {
-    label: 'Lock',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="11" width="18" height="11" rx="2" />
-        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-      </svg>
-    ),
-  },
-  star: {
-    label: 'Star',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-      </svg>
-    ),
-  },
-  lightning: {
-    label: 'Flash',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="currentColor">
-        <path d="M13 2L4.09 12.8c-.36.44-.56.99-.56 1.56 0 1.38 1.12 2.5 2.5 2.5H11l-1 6.5L19.91 11.2c.36-.44.56-.99.56-1.56 0-1.38-1.12-2.5-2.5-2.5H13l1-6.14z" />
-      </svg>
-    ),
-  },
-  eye: {
-    label: 'Watch',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-        <circle cx="12" cy="12" r="3" />
-      </svg>
-    ),
-  },
-  flag: {
-    label: 'Flag',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-        <line x1="4" y1="22" x2="4" y2="15" />
-      </svg>
-    ),
-  },
-  bookmark: {
-    label: 'Saves',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-      </svg>
-    ),
-  },
-  layers: {
-    label: 'Layers',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polygon points="12 2 2 7 12 12 22 7 12 2" />
-        <polyline points="2 17 12 22 22 17" />
-        <polyline points="2 12 12 17 22 12" />
-      </svg>
-    ),
-  },
-  settings: {
-    label: 'Config',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="3" />
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-      </svg>
-    ),
-  },
-  fire: {
-    label: 'Hot',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+        <path d="M12 13v4" />
+        <circle cx="12" cy="17" r="0.5" fill="currentColor" />
       </svg>
     ),
   },
 
-  /* ── Business Icons ── */
-  briefcase: {
-    label: 'Business',
+  // --- 2. Risk Management ---
+  risk_calc: {
+    label: 'Pos Size',
     svg: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="2" y="7" width="20" height="14" rx="2" />
-        <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
-        <line x1="12" y1="12" x2="12" y2="12" />
-        <path d="M2 12h20" />
+        <rect x="4" y="3" width="16" height="18" rx="2" />
+        <line x1="8" y1="7" x2="16" y2="7" />
+        <circle cx="8" cy="12" r="1" fill="currentColor" />
+        <circle cx="12" cy="12" r="1" fill="currentColor" />
+        <circle cx="16" cy="12" r="1" fill="currentColor" />
+        <circle cx="8" cy="16" r="1" fill="currentColor" />
+        <circle cx="12" cy="16" r="1" fill="currentColor" />
+        <circle cx="16" cy="16" r="1" fill="currentColor" />
       </svg>
     ),
   },
-  handshake: {
-    label: 'Deal',
+  stop_loss: {
+    label: 'Stop Loss',
     svg: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M20.42 4.58a5.4 5.4 0 0 0-7.65 0l-.77.78-.77-.78a5.4 5.4 0 0 0-7.65 0C1.46 6.7 1.33 10.28 4 13l8 8 8-8c2.67-2.72 2.54-6.3.42-8.42z" />
-        <path d="M12 5.36 8.87 8.5a2.13 2.13 0 0 0 0 3l3.13 3.13 3.13-3.13a2.13 2.13 0 0 0 0-3L12 5.36z" />
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        <line x1="8" y1="12" x2="16" y2="12" />
       </svg>
     ),
   },
-  users: {
-    label: 'Team',
+  take_profit: {
+    label: 'Take Prof',
     svg: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+        <line x1="4" y1="22" x2="4" y2="15" />
+        <line x1="12" y1="8" x2="16" y2="8" />
+        <line x1="14" y1="6" x2="14" y2="10" />
       </svg>
     ),
   },
-  growth: {
-    label: 'Growth',
+  risk_reward: {
+    label: 'R:R',
     svg: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
-        <polyline points="17 6 23 6 23 12" />
+        <path d="M12 3v18" />
+        <path d="M5 8h14" />
+        <path d="M3 13l2-5 2 5a2 2 0 0 1-4 0z" />
+        <path d="M17 13l2-5 2 5a2 2 0 0 1-4 0z" />
+        <path d="M8 21h8" />
       </svg>
     ),
   },
-  target2: {
-    label: 'Goal',
+  drawdown_guard: {
+    label: 'Drawdown',
     svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-        <circle cx="12" cy="12" r="10" />
-        <circle cx="12" cy="12" r="6" />
-        <circle cx="12" cy="12" r="2" />
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z" />
+        <path d="M12 6v6l4 2" />
+        <line x1="8" y1="16" x2="16" y2="8" />
       </svg>
     ),
   },
-  cash: {
-    label: 'Revenue',
+
+  // --- 3. Trading Psychology ---
+  trading_mindset: {
+    label: 'Mindset',
     svg: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="1" y="4" width="22" height="16" rx="2" />
-        <line x1="1" y1="10" x2="23" y2="10" />
+        <path d="M12 2a5 5 0 0 0-5 5c0 2 1 3.5 2.5 4.5A5 5 0 0 0 7 17a5 5 0 0 0 10 0 5 5 0 0 0-2.5-5.5C16 10.5 17 9 17 7a5 5 0 0 0-5-5z" />
+        <line x1="12" y1="8" x2="12" y2="12" />
       </svg>
     ),
   },
-  invoice: {
-    label: 'Invoice',
+  discipline_lock: {
+    label: 'Lock',
     svg: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-        <polyline points="14 2 14 8 20 8" />
-        <line x1="16" y1="13" x2="8" y2="13" />
-        <line x1="16" y1="17" x2="8" y2="17" />
-        <polyline points="10 9 9 9 8 9" />
+        <rect x="5" y="11" width="14" height="10" rx="2" />
+        <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+        <circle cx="12" cy="16" r="1" fill="currentColor" />
       </svg>
     ),
   },
-  megaphone: {
-    label: 'Market',
+  fomo_guard: {
+    label: 'FOMO',
     svg: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 11l19-9-9 19-2-8-8-2z" />
+        <circle cx="12" cy="12" r="9" />
+        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
       </svg>
     ),
   },
-  network: {
-    label: 'Network',
+  patience_clock: {
+    label: 'Patience',
     svg: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="5" r="3" />
-        <circle cx="19" cy="19" r="3" />
-        <circle cx="5" cy="19" r="3" />
-        <line x1="12" y1="8" x2="12" y2="14" />
-        <line x1="12" y1="14" x2="19" y2="16" />
-        <line x1="12" y1="14" x2="5" y2="16" />
+        <path d="M5 22h14" />
+        <path d="M5 2h14" />
+        <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L13.414 13.414a2 2 0 0 1 0-2.828l3-3A2 2 0 0 0 17 6.172V2" />
+        <path d="M7 22v-4.172a2 2 0 0 1 .586-1.414l3-3a2 2 0 0 0 0-2.828l-3-3A2 2 0 0 1 7 6.172V2" />
       </svg>
     ),
   },
-  checklist: {
-    label: 'Tasks',
+
+  // --- 4. Trading Strategy ---
+  breakout_pattern: {
+    label: 'Breakout',
     svg: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="9" y1="11" x2="21" y2="11" />
-        <line x1="9" y1="17" x2="21" y2="17" />
-        <line x1="9" y1="5" x2="21" y2="5" />
-        <polyline points="4 11 2 13 4 15" />
-        <polyline points="4 5 2 7 4 9" />
+        <line x1="3" y1="8" x2="21" y2="8" strokeDasharray="3 3" />
+        <polyline points="4 18 10 12 14 15 20 5" />
+        <polyline points="15 5 20 5 20 10" />
       </svg>
     ),
   },
-  strategy: {
-    label: 'Strategy',
+  support_resistance: {
+    label: 'S/R',
     svg: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+        <line x1="3" y1="5" x2="21" y2="5" />
+        <line x1="3" y1="19" x2="21" y2="19" />
+        <polyline points="4 15 8 9 12 15 16 9 20 15" />
       </svg>
     ),
   },
-  balance: {
-    label: 'P&L',
+  smart_money: {
+    label: 'SMC',
     svg: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="12" y1="1" x2="12" y2="23" />
-        <path d="M5 5h14" />
-        <path d="M5 19h14" />
-        <path d="M5 12h14" />
+        <path d="M3 17l6-6 4 4 8-8" />
+        <polyline points="14 7 21 7 21 14" />
+        <circle cx="9" cy="11" r="1.5" fill="currentColor" />
+        <circle cx="13" cy="15" r="1.5" fill="currentColor" />
+      </svg>
+    ),
+  },
+  supply_demand: {
+    label: 'Sup/Dem',
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="5" rx="1" />
+        <rect x="3" y="16" width="18" height="5" rx="1" />
+        <polyline points="6 14 10 10 14 12 18 8" />
+      </svg>
+    ),
+  },
+  chart_pattern: {
+    label: 'Pattern',
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 18l4-6 3 3 3-9 3 9 3-3 4 6" />
+        <line x1="2" y1="18" x2="22" y2="18" />
+      </svg>
+    ),
+  },
+
+  // --- 5. Trade Execution ---
+  buy_order: {
+    label: 'Buy',
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <polyline points="8 12 12 8 16 12" />
+        <line x1="12" y1="8" x2="12" y2="16" />
+      </svg>
+    ),
+  },
+  sell_order: {
+    label: 'Sell',
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <polyline points="8 12 12 16 16 12" />
+        <line x1="12" y1="8" x2="12" y2="16" />
+      </svg>
+    ),
+  },
+  instant_execution: {
+    label: 'Exec',
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9" />
+        <polygon points="13 4 7 13 12 13 11 20 17 11 12 11 13 4" fill="currentColor" fillOpacity="0.2" />
+      </svg>
+    ),
+  },
+  pending_order: {
+    label: 'Pending',
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="8" />
+        <polyline points="12 8 12 12 15 14" />
+        <line x1="2" y1="12" x2="4" y2="12" />
+        <line x1="20" y1="12" x2="22" y2="12" />
+      </svg>
+    ),
+  },
+
+  // --- 6. Trade Management ---
+  breakeven: {
+    label: 'BE',
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="2" y1="12" x2="22" y2="12" />
+        <rect x="9" y="8" width="6" height="8" rx="1" />
+        <path d="M10 8V6a2 2 0 0 1 4 0v2" />
+      </svg>
+    ),
+  },
+  partial_close: {
+    label: 'Partials',
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
+        <path d="M22 12A10 10 0 0 0 12 2v10z" fill="currentColor" fillOpacity="0.2" />
+      </svg>
+    ),
+  },
+  trailing_stop: {
+    label: 'Trail SL',
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="3 17 8 17 8 12 13 12 13 7 18 7 18 2" />
+        <polyline points="3 21 21 21" />
+      </svg>
+    ),
+  },
+
+  // --- 7. Trade Review & Journaling ---
+  trade_journal: {
+    label: 'Journal',
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+        <line x1="9" y1="7" x2="15" y2="7" />
+        <line x1="9" y1="11" x2="15" y2="11" />
+      </svg>
+    ),
+  },
+  win_rate_stats: {
+    label: 'Win Rate',
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="18" y1="20" x2="18" y2="10" />
+        <line x1="12" y1="20" x2="12" y2="4" />
+        <line x1="6" y1="20" x2="6" y2="14" />
+        <polyline points="2 20 22 20" />
+      </svg>
+    ),
+  },
+  trade_replay: {
+    label: 'Replay',
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="5 3 19 12 5 21 5 3" fill="currentColor" fillOpacity="0.2" />
+        <path d="M19 5v14" />
       </svg>
     ),
   },
@@ -426,60 +404,102 @@ interface ModeDetail {
   options: string[];
 }
 
+const isVideoUrl = (url: string): boolean => {
+  if (!url) return false;
+  if (url.startsWith('data:video/')) return true;
+  const cleanUrl = url.split('?')[0].toLowerCase();
+  return (
+    cleanUrl.endsWith('.mp4') ||
+    cleanUrl.endsWith('.webm') ||
+    cleanUrl.endsWith('.ogg') ||
+    cleanUrl.endsWith('.mov') ||
+    cleanUrl.endsWith('.m4v') ||
+    cleanUrl.endsWith('.mkv') ||
+    cleanUrl.endsWith('.avi')
+  );
+};
+
 const DEFAULT_MODES: Record<string, ModeDetail> = {
-  target: {
-    title: 'Precision',
-    accent: 'rgba(215,25,75,0.9)',
-    soft: 'rgba(255,40,100,0.16)',
-    defaultAccent: 'rgba(215,25,75,0.9)',
-    defaultSoft: 'rgba(255,40,100,0.16)',
-    options: ['Scalping session', 'Sniper entry only', 'Wait for confluence', 'HTF confirmation'],
+  business: {
+    title: 'Market Analysis',
+    accent: 'rgba(30, 140, 255, 0.9)',
+    soft: 'rgba(60, 170, 255, 0.18)',
+    defaultAccent: 'rgba(30, 140, 255, 0.9)',
+    defaultSoft: 'rgba(60, 170, 255, 0.18)',
+    options: [
+      'Analyze higher timeframe (D1/H4) trend',
+      'Mark key Support & Resistance / Liquidity zones',
+      'Check Economic Calendar for high-impact news',
+      'Identify market structure (BOS / CHoCH)',
+    ],
   },
-  candle: {
-    title: 'Analysis',
-    accent: 'rgba(140,0,225,0.9)',
-    soft: 'rgba(170,0,255,0.16)',
-    defaultAccent: 'rgba(140,0,225,0.9)',
-    defaultSoft: 'rgba(170,0,255,0.16)',
-    options: ['1H candlestick review', '4H structure check', 'Daily bias', 'Weekly trend'],
+  life: {
+    title: 'Risk Management',
+    accent: 'rgba(0, 190, 80, 0.9)',
+    soft: 'rgba(0, 230, 100, 0.16)',
+    defaultAccent: 'rgba(0, 190, 80, 0.9)',
+    defaultSoft: 'rgba(0, 230, 100, 0.16)',
+    options: [
+      'Calculate max risk per trade (1% - 2%)',
+      'Set precise Stop Loss price before entry',
+      'Verify Risk-to-Reward ratio (min 1:2)',
+      'Confirm total account margin & lot size',
+    ],
   },
-  dollar: {
-    title: 'Risk & P&L',
-    accent: 'rgba(205,15,95,0.9)',
-    soft: 'rgba(255,30,110,0.16)',
-    defaultAccent: 'rgba(205,15,95,0.9)',
-    defaultSoft: 'rgba(255,30,110,0.16)',
-    options: ['1% risk per trade', 'Review open P&L', 'Set daily loss limit', 'Check margin level'],
+  pc: {
+    title: 'Trading Strategy',
+    accent: 'rgba(140, 0, 225, 0.9)',
+    soft: 'rgba(170, 0, 255, 0.16)',
+    defaultAccent: 'rgba(140, 0, 225, 0.9)',
+    defaultSoft: 'rgba(170, 0, 255, 0.16)',
+    options: [
+      'Wait for clear setup at Key Zone / Order Block',
+      'Confirm lower timeframe entry trigger (M15/M5)',
+      'Check confluence indicators (RSI, MA, Volume)',
+      'Avoid trading inside low-liquidity chop',
+    ],
   },
   sync: {
-    title: 'Do Not Disturb',
-    accent: 'rgba(110,0,210,0.9)',
-    soft: 'rgba(130,0,255,0.16)',
-    defaultAccent: 'rgba(110,0,210,0.9)',
-    defaultSoft: 'rgba(130,0,255,0.16)',
-    options: ['For an hour', 'For Today', 'Until This Weekend', 'Until Goals Met'],
+    title: 'Trade Execution',
+    accent: 'rgba(215, 25, 75, 0.9)',
+    soft: 'rgba(255, 40, 100, 0.16)',
+    defaultAccent: 'rgba(215, 25, 75, 0.9)',
+    defaultSoft: 'rgba(255, 40, 100, 0.16)',
+    options: [
+      'Place Buy/Sell Order with preset SL & TP',
+      'Move Stop Loss to Break-Even at 1:1 R:R',
+      'Take partial profits at key target levels',
+      'Let winning trade run to final Take Profit',
+    ],
   },
   alerts: {
-    title: 'Alerts',
-    accent: 'rgba(0,180,155,0.9)',
-    soft: 'rgba(0,210,180,0.18)',
-    defaultAccent: 'rgba(0,180,155,0.9)',
-    defaultSoft: 'rgba(0,210,180,0.18)',
-    options: ['NFP release', 'FOMC statement', 'CPI data drop', 'Market open bell'],
+    title: 'Review & Journaling',
+    accent: 'rgba(220, 100, 0, 0.9)',
+    soft: 'rgba(255, 140, 0, 0.18)',
+    defaultAccent: 'rgba(220, 100, 0, 0.9)',
+    defaultSoft: 'rgba(255, 140, 0, 0.18)',
+    options: [
+      'Screenshot chart before and after trade',
+      'Log entry, exit, lot size, and PnL in Journal',
+      'Review trade execution against rules & mindset',
+      'Rate psychological discipline (1 - 5 stars)',
+    ],
   },
 };
 
-// Play the high-quality Princess Bell MP3 chime repeated 5 times
+// Play the high-quality Princess Bell MP3 chime repeated 3 times with 3-second intervals
 const playModernChime = () => {
   try {
     let playCount = 0;
     const playNext = () => {
-      if (playCount >= 5) return;
+      if (playCount >= 3) return;
       const audio = new Audio("https://raw.githubusercontent.com/Bl3551nq/bell-sound/main/princess_bell.mp3");
       audio.volume = 0.8;
       audio.addEventListener('ended', () => {
         playCount++;
-        playNext();
+        if (playCount < 3) {
+          setTimeout(playNext, 3000);
+        }
       });
       audio.play().catch((err) => {
         console.warn("Audio play failed or was blocked by browser autoplay restrictions:", err);
@@ -499,10 +519,10 @@ const formatTime = (secs: number): string => {
 };
 
 export default function App() {
-  // ── State ──
-  const [currentMode, setCurrentMode] = useState<string>('sync');
   const [activeApp, setActiveApp] = useState<'checklist' | 'calendar'>('checklist');
   const [calendarSettingsOpen, setCalendarSettingsOpen] = useState<boolean>(false);
+  // ── State ──
+  const [currentMode, setCurrentMode] = useState<string>('business');
   const [editMode, setEditMode] = useState<boolean>(false);
   const [isLight, setIsLight] = useState<boolean>(false);
   const [minimized, setMinimized] = useState<boolean>(false);
@@ -544,6 +564,37 @@ export default function App() {
     }
   });
 
+  const [animateMinimizedText, setAnimateMinimizedText] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('fm_animate_minimized_text');
+      return saved !== 'false';
+    } catch (e) {
+      return true;
+    }
+  });
+
+  const [moveCheckedToBottom, setMoveCheckedToBottom] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('fm_move_checked_bottom');
+      return saved !== 'false';
+    } catch (e) {
+      return true;
+    }
+  });
+
+  const [isChecklistScrolling, setIsChecklistScrolling] = useState(false);
+  const checklistScrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleChecklistScroll = () => {
+    setIsChecklistScrolling(true);
+    if (checklistScrollTimeoutRef.current) {
+      clearTimeout(checklistScrollTimeoutRef.current);
+    }
+    checklistScrollTimeoutRef.current = setTimeout(() => {
+      setIsChecklistScrolling(false);
+    }, 800);
+  };
+
   const handleShowCountdownChange = (val: boolean) => {
     setShowCountdown(val);
     localStorage.setItem('fm_show_countdown', String(val));
@@ -561,33 +612,608 @@ export default function App() {
     localStorage.setItem('fm_alarm_enabled', String(val));
   };
 
+  const handleAnimateMinimizedTextChange = (val: boolean) => {
+    setAnimateMinimizedText(val);
+    localStorage.setItem('fm_animate_minimized_text', String(val));
+  };
+
+  const handleMoveCheckedToBottomChange = (val: boolean) => {
+    setMoveCheckedToBottom(val);
+    localStorage.setItem('fm_move_checked_bottom', String(val));
+  };
+
+  const [animationsEnabled, setAnimationsEnabled] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('fm_animations_enabled');
+      return saved !== 'false';
+    } catch (e) {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    if (!animationsEnabled) {
+      document.body.classList.add('animations-disabled');
+    } else {
+      document.body.classList.remove('animations-disabled');
+    }
+  }, [animationsEnabled]);
+
+  const handleAnimationsEnabledChange = (val: boolean) => {
+    setAnimationsEnabled(val);
+    localStorage.setItem('fm_animations_enabled', String(val));
+  };
+
+  // Wallpaper Background State & Handlers
+  const [wallpaperUrl, setWallpaperUrl] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('fm_wallpaper_url');
+      return saved !== null ? saved : wallpaperGokuBack;
+    } catch (e) {
+      return wallpaperGokuBack;
+    }
+  });
+
+  const [customWallpapers, setCustomWallpapers] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('fm_custom_wallpapers');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    // If there's an existing saved custom wallpaperUrl not in PRESET_WALLPAPERS, populate it
+    const initialUrl = localStorage.getItem('fm_wallpaper_url');
+    if (initialUrl && !PRESET_WALLPAPERS.some((wp) => wp.url === initialUrl)) {
+      return [initialUrl];
+    }
+    return [];
+  });
+
+  const [wallpaperOpacity, setWallpaperOpacity] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('fm_wallpaper_opacity');
+      if (saved !== null) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 0 && parsed <= 100) return parsed;
+      }
+    } catch (e) {}
+    return 60;
+  });
+
+  const wallpaperFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleWallpaperUrlChange = (url: string) => {
+    setWallpaperUrl(url);
+    localStorage.setItem('fm_wallpaper_url', url);
+  };
+
+  const handleWallpaperOpacityChange = (val: number) => {
+    setWallpaperOpacity(val);
+    localStorage.setItem('fm_wallpaper_opacity', String(val));
+  };
+
+  const MAX_WALLPAPER_SIZE = 3 * 1024 * 1024; // 3MB
+
+  const handleCustomWallpaperUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > MAX_WALLPAPER_SIZE) {
+      setImportStatus({
+        type: 'error',
+        message: `File size exceeds 3MB limit (${(file.size / (1024 * 1024)).toFixed(2)}MB). Please choose a file under 3MB.`,
+      });
+      setTimeout(() => setImportStatus(null), 4500);
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      if (result) {
+        setCustomWallpapers((prev) => {
+          const updated = [result, ...prev.filter((url) => url !== result)].slice(0, 8);
+          try {
+            localStorage.setItem('fm_custom_wallpapers', JSON.stringify(updated));
+          } catch (err) {
+            console.warn('LocalStorage quota reached for custom wallpapers', err);
+          }
+          return updated;
+        });
+        handleWallpaperUrlChange(result);
+        const isVid = file.type.startsWith('video/') || isVideoUrl(result);
+        setImportStatus({
+          type: 'success',
+          message: isVid ? 'Video wallpaper applied! ✓' : 'Wallpaper image applied! ✓',
+        });
+        setTimeout(() => setImportStatus(null), 3500);
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleDeleteCustomWallpaper = (e: React.MouseEvent, urlToDelete: string) => {
+    e.stopPropagation();
+    setCustomWallpapers((prev) => {
+      const updated = prev.filter((url) => url !== urlToDelete);
+      try {
+        localStorage.setItem('fm_custom_wallpapers', JSON.stringify(updated));
+      } catch (err) {}
+      return updated;
+    });
+    if (wallpaperUrl === urlToDelete) {
+      handleWallpaperUrlChange(wallpaperGokuBack);
+    }
+  };
+
+  // Import & Export Checklist State & Handlers
+  const importFileInputRef = useRef<HTMLInputElement>(null);
+  const [importStatus, setImportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const handleExportChecklist = () => {
+    try {
+      let txtContent = ``;
+
+      Object.entries(modes).forEach(([_, mVal]) => {
+        const detail = mVal as ModeDetail;
+        txtContent += `[${detail.title}]\n`;
+        detail.options.forEach((opt) => {
+          txtContent += `- ${opt}\n`;
+        });
+        txtContent += `\n`;
+      });
+
+      const dataStr = 'data:text/plain;charset=utf-8,' + encodeURIComponent(txtContent.trim());
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', dataStr);
+      downloadAnchor.setAttribute('download', `overdesk_checklist_${new Date().toISOString().slice(0, 10)}.txt`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+
+      setImportStatus({ type: 'success', message: 'Exported checklist to .txt successfully!' });
+      setTimeout(() => setImportStatus(null), 3500);
+    } catch (err) {
+      setImportStatus({ type: 'error', message: 'Export failed.' });
+    }
+  };
+
+  const generateChecklistTemplate = () => {
+    try {
+      const templateTxt = `[Work & Office]
+- Review client proposals
+- Team sync & project status
+- Approve pending invoices
+- Quarterly goal check-in
+
+[Everyday Life]
+- Morning coffee & planning
+- Grocery list & errands
+- 30 min workout or walk
+- Evening downtime & book
+
+[PC & Workstation]
+- Clean desktop & downloads
+- System & security updates
+- Backup important files
+- Organize workspace tabs
+
+[Focus & DND]
+- Deep work block
+- Mute phone & chat alerts
+- Close distraction tabs
+- Single-task until finished
+
+[Daily Schedule]
+- Check today's calendar
+- Review top 3 priorities
+- Follow up on key emails
+- End-of-day summary
+`;
+
+      const dataStr = 'data:text/plain;charset=utf-8,' + encodeURIComponent(templateTxt.trim());
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', dataStr);
+      downloadAnchor.setAttribute('download', 'checklist_template.txt');
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+
+      setImportStatus({ type: 'success', message: 'Standard 5-mode template downloaded! Edit & import anytime.' });
+      setTimeout(() => setImportStatus(null), 3500);
+    } catch (err) {
+      setImportStatus({ type: 'error', message: 'Failed to download template.' });
+    }
+  };
+
+  const handleImportChecklistFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = (event.target?.result as string) || '';
+
+        const itemsToProcess: Array<{
+          id: string;
+          heading: string;
+          items: string[];
+          accent?: string;
+          soft?: string;
+          icon?: string;
+        }> = [];
+
+        // Check if content looks like JSON
+        let isJson = false;
+        try {
+          const trimmed = content.trim();
+          if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+            const parsed = JSON.parse(content);
+            isJson = true;
+
+            if (Array.isArray(parsed.checklists)) {
+              parsed.checklists.forEach((item: any, idx: number) => {
+                if (!item || typeof item !== 'object') return;
+                const id = item.id || item.key || `mode_${idx + 1}`;
+                const rawHeading = String(item.heading || item.title || item.name || `Checklist ${idx + 1}`).trim();
+                const heading = rawHeading.slice(0, 30) || `Checklist ${idx + 1}`;
+                const rawItems = item.items || item.options || item.tasks || [];
+                const items = Array.isArray(rawItems)
+                  ? rawItems.map((opt: any) => String(opt || '').trim().slice(0, 100)).filter(Boolean)
+                  : [];
+                itemsToProcess.push({
+                  id,
+                  heading,
+                  items: items.length > 0 ? items : ['New task item'],
+                  accent: item.accent,
+                  soft: item.soft,
+                  icon: item.icon,
+                });
+              });
+            } else if (parsed.modes && typeof parsed.modes === 'object') {
+              Object.entries(parsed.modes).forEach(([mKey, mVal]: [string, any]) => {
+                if (!mVal || typeof mVal !== 'object') return;
+                const rawHeading = String(mVal.title || mVal.heading || mVal.name || 'Custom Mode').trim();
+                const heading = rawHeading.slice(0, 30) || 'Custom Mode';
+                const rawItems = mVal.options || mVal.items || mVal.tasks || [];
+                const items = Array.isArray(rawItems)
+                  ? rawItems.map((opt: any) => String(opt || '').trim().slice(0, 100)).filter(Boolean)
+                  : [];
+                itemsToProcess.push({
+                  id: mKey,
+                  heading,
+                  items: items.length > 0 ? items : ['New task item'],
+                  accent: mVal.accent,
+                  soft: mVal.soft,
+                  icon: mVal.icon || (parsed.iconAssignments ? parsed.iconAssignments[mKey] : undefined),
+                });
+              });
+            } else if (Array.isArray(parsed)) {
+              if (parsed.every((x) => typeof x === 'string')) {
+                itemsToProcess.push({
+                  id: 'imported',
+                  heading: 'Imported Checklist',
+                  items: parsed.map((s) => String(s).trim().slice(0, 100)).filter(Boolean),
+                });
+              } else {
+                parsed.forEach((item: any, idx: number) => {
+                  if (!item || typeof item !== 'object') return;
+                  const id = item.id || item.key || `mode_${idx + 1}`;
+                  const rawHeading = String(item.heading || item.title || item.name || `Checklist ${idx + 1}`).trim();
+                  const heading = rawHeading.slice(0, 30) || `Checklist ${idx + 1}`;
+                  const rawItems = item.items || item.options || item.tasks || [];
+                  const items = Array.isArray(rawItems)
+                    ? rawItems.map((opt: any) => String(opt || '').trim().slice(0, 100)).filter(Boolean)
+                    : [];
+                  itemsToProcess.push({
+                    id,
+                    heading,
+                    items: items.length > 0 ? items : ['New task item'],
+                    accent: item.accent,
+                    soft: item.soft,
+                    icon: item.icon,
+                  });
+                });
+              }
+            }
+          }
+        } catch {
+          isJson = false;
+        }
+
+        // If not JSON or JSON produced no items, parse as plain .txt format!
+        if (!isJson || itemsToProcess.length === 0) {
+          const lines = content.split(/\r?\n/);
+          let currentHeading = 'Imported Checklist';
+          let currentId = 'imported';
+          let currentItems: string[] = [];
+          let modeCount = 0;
+
+          const flushCurrent = () => {
+            if (currentItems.length > 0 || modeCount > 0) {
+              const cleanHeading = currentHeading.replace(/^\[+|\]+$/g, '').trim().slice(0, 30) || 'Checklist';
+              itemsToProcess.push({
+                id: currentId,
+                heading: cleanHeading,
+                items: currentItems.length > 0 ? currentItems : ['New task item'],
+              });
+            }
+          };
+
+          lines.forEach((line) => {
+            const trimmed = line.trim();
+            if (!trimmed) return;
+
+            // Strict comment line filter: Ignore ANY line starting with #, //, or --
+            if (trimmed.startsWith('#') || trimmed.startsWith('//') || trimmed.startsWith('--')) {
+              return;
+            }
+
+            // Heading match 1: [Heading Name]
+            const bracketMatch = trimmed.match(/^\[([^\]]+)\]$/);
+            // Heading match 2: Colon heading like "Work & Projects:" (short, under 32 chars)
+            const colonMatch = trimmed.length <= 32 ? trimmed.match(/^([A-Za-z0-9\s&'-]{2,32}):$/) : null;
+            // Heading match 3: MODE: Heading Name
+            const modePrefixMatch = trimmed.match(/^(?:MODE|LIST|CHECKLIST)\s*:\s*(.+)$/i);
+
+            const matchedHeading = bracketMatch
+              ? bracketMatch[1].trim()
+              : (colonMatch
+                  ? colonMatch[1].trim()
+                  : (modePrefixMatch
+                      ? modePrefixMatch[1].trim()
+                      : null));
+
+            if (matchedHeading) {
+              if (currentItems.length > 0 || modeCount > 0) {
+                flushCurrent();
+              }
+              modeCount++;
+              const cleanH = matchedHeading.replace(/^\[+|\]+$/g, '').trim().slice(0, 30);
+              currentHeading = cleanH || `Checklist ${modeCount}`;
+              currentId = cleanH.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || `mode_${modeCount}`;
+              currentItems = [];
+            } else {
+              // Regular item line - clean leading bullet formatting (- *, •, 1., [ ], [x], etc.)
+              let cleanItem = trimmed.replace(/^([-*•+]|\[[ xX]?\]|\d+[\.\)])\s*/, '').trim();
+              if (cleanItem) {
+                currentItems.push(cleanItem.slice(0, 100));
+              }
+            }
+          });
+
+          if (currentItems.length > 0 || (modeCount > 0 && itemsToProcess.length === 0)) {
+            flushCurrent();
+          }
+        }
+
+        // Strict 5 mode requirement check
+        if (itemsToProcess.length !== 5) {
+          setImportStatus({
+            type: 'error',
+            message: `Import failed: Standard 5 modes required (found ${itemsToProcess.length}). Files with fewer or more modes cannot be imported.`,
+          });
+          return;
+        }
+
+        const standardKeys = ['work', 'life', 'pc', 'sync', 'alerts'];
+        const importedModes: Record<string, ModeDetail> = {};
+        const importedSelections: Record<string, number[]> = {};
+        const importedIcons: Record<string, string> = { ...iconAssignments };
+
+        itemsToProcess.forEach((item, index) => {
+          const mKey = standardKeys[index] || `mode_${index + 1}`;
+          const existingModeData = modes[mKey];
+          const defaultAccentList = [
+            'rgba(30, 140, 255, 0.9)',
+            'rgba(0, 190, 80, 0.9)',
+            'rgba(140, 0, 225, 0.9)',
+            'rgba(215, 25, 75, 0.9)',
+            'rgba(220, 100, 0, 0.9)',
+          ];
+          const defaultSoftList = [
+            'rgba(60, 170, 255, 0.18)',
+            'rgba(0, 230, 100, 0.16)',
+            'rgba(170, 0, 255, 0.16)',
+            'rgba(255, 40, 100, 0.16)',
+            'rgba(255, 140, 0, 0.18)',
+          ];
+          const defaultIcons = ['briefcase', 'home', 'laptop', 'shield', 'calendar'];
+
+          const accent = item.accent || existingModeData?.accent || defaultAccentList[index % defaultAccentList.length];
+          const soft = item.soft || existingModeData?.soft || defaultSoftList[index % defaultSoftList.length];
+
+          importedModes[mKey] = {
+            title: item.heading,
+            accent,
+            soft,
+            defaultAccent: existingModeData?.defaultAccent || accent,
+            defaultSoft: existingModeData?.defaultSoft || soft,
+            options: item.items,
+          };
+
+          importedSelections[mKey] = [];
+
+          if (item.icon) {
+            importedIcons[mKey] = item.icon;
+          } else if (iconAssignments[mKey]) {
+            importedIcons[mKey] = iconAssignments[mKey];
+          } else {
+            importedIcons[mKey] = defaultIcons[index % defaultIcons.length];
+          }
+        });
+
+        setModes(importedModes);
+        setSelections(importedSelections);
+        setIconAssignments(importedIcons);
+
+        localStorage.setItem('fm_modes', JSON.stringify(importedModes));
+        localStorage.setItem('fm_icons', JSON.stringify(importedIcons));
+        Object.keys(importedModes).forEach((k) => {
+          localStorage.setItem('fm_sel_' + k, JSON.stringify(importedSelections[k] || []));
+        });
+
+        const firstKey = standardKeys[0];
+        if (firstKey) {
+          setCurrentMode(firstKey);
+        }
+
+        playSoundChime('complete');
+        setImportStatus({
+          type: 'success',
+          message: `Imported standard 5-mode checklist successfully! ✓`,
+        });
+        setTimeout(() => setImportStatus(null), 4000);
+      } catch (err) {
+        setImportStatus({ type: 'error', message: 'Failed to parse text file.' });
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  // Reset App logic (Double click to confirm)
+  const [resetConfirming, setResetConfirming] = useState<boolean>(false);
+  const resetTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const performAppReset = () => {
+    try {
+      localStorage.clear();
+    } catch (e) {
+      console.error('Failed to clear localStorage:', e);
+    }
+
+    setModes(JSON.parse(JSON.stringify(DEFAULT_MODES)));
+    setIconAssignments({
+      business: 'candlestick',
+      life: 'stop_loss',
+      pc: 'smart_money',
+      sync: 'instant_execution',
+      alerts: 'trade_journal',
+    });
+    setCustomIcons({});
+    setCurrentMode('business');
+    setEditMode(false);
+    setIsLight(false);
+    setMinimized(false);
+    setScale(1);
+    setShowCountdown(true);
+    setCountdownDuration(300);
+    setCountdownTimeLeft(300);
+    setIsTimerRunning(false);
+    setAlarmEnabled(true);
+    setAnimateMinimizedText(true);
+    setAnimationsEnabled(true);
+    setMoveCheckedToBottom(true);
+    setWallpaperUrl(wallpaperGokuBack);
+    setCustomWallpapers([]);
+    setWallpaperOpacity(60);
+    setResetConfirming(false);
+    setImportStatus({ type: 'success', message: 'App reset to default settings successfully! ✓' });
+    setTimeout(() => setImportStatus(null), 3500);
+  };
+
+  const handleResetAppClick = () => {
+    if (resetConfirming) {
+      performAppReset();
+    } else {
+      setResetConfirming(true);
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+      resetTimerRef.current = setTimeout(() => {
+        setResetConfirming(false);
+      }, 3500);
+    }
+  };
+
+  const handleResetAppDoubleClick = () => {
+    performAppReset();
+  };
+
+  // Everyday Reminder State (Minimized Mode - Max 16 words & 100 chars)
+  const clampWords = (text: string, maxWords: number = 16, maxChars: number = 100) => {
+    let trimmed = text.trim();
+    if (trimmed.length > maxChars) {
+      trimmed = trimmed.slice(0, maxChars);
+    }
+    const words = trimmed.split(/\s+/).filter(Boolean);
+    if (words.length > maxWords) {
+      return words.slice(0, maxWords).join(' ');
+    }
+    return trimmed;
+  };
+
+  const [reminderText, setReminderText] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('fm_reminder_text');
+      const text = saved || 'Focus on what matters today. 💡';
+      return clampWords(text, 16);
+    } catch (e) {
+      return 'Focus on what matters today. 💡';
+    }
+  });
+  const [isEditingReminder, setIsEditingReminder] = useState<boolean>(false);
+  const [tempReminderText, setTempReminderText] = useState<string>('');
+
+  const handleSaveReminder = () => {
+    const trimmed = tempReminderText.trim() || 'Focus on what matters today. 💡';
+    const clamped = clampWords(trimmed, 16);
+    setReminderText(clamped);
+    setIsEditingReminder(false);
+    localStorage.setItem('fm_reminder_text', clamped);
+  };
+
+  const getReminderFontSize = (textStr: string) => {
+    const len = textStr.length;
+    if (len > 60) return '14px';
+    if (len > 30) return '17px';
+    return '21px';
+  };
+
   // License State
   const [licenseActive, setLicenseActive] = useState<boolean>(true); // active by default in web preview
   const [licenseInput, setLicenseInput] = useState<string>('');
   const [licenseError, setLicenseError] = useState<boolean>(false);
   const [licenseAPIErrorText, setLicenseAPIErrorText] = useState<string>('');
 
+  // Drag reorder states
+  const isDraggingModeRef = useRef<boolean>(false);
+  const [modeDragState, setModeDragState] = useState<{
+    activeKey: string;
+    fromIdx: number;
+    currentIdx: number;
+    startX: number;
+    currentX: number;
+  } | null>(null);
+  const draggedModeIdxRef = useRef<number | null>(null);
+  const [draggedModeIdx, setDraggedModeIdx] = useState<number | null>(null);
+  const [dragOverModeIdx, setDragOverModeIdx] = useState<number | null>(null);
+  const [draggedOptionIdx, setDraggedOptionIdx] = useState<number | null>(null);
+
   // Modular Modes Storage
   const [modes, setModes] = useState<Record<string, ModeDetail>>(() => {
     try {
-      const saved = localStorage.getItem('fm_modes');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Ensure accurate merge with initial fields
-        const mergedObj = { ...DEFAULT_MODES };
-        Object.keys(parsed).forEach((k) => {
-          if (mergedObj[k]) {
-            if (typeof parsed[k].title === 'string' && parsed[k].title.length > 0) {
-              mergedObj[k].title = parsed[k].title;
-            }
-            if (Array.isArray(parsed[k].options) && parsed[k].options.length > 0) {
-              mergedObj[k].options = parsed[k].options;
-            }
-            if (parsed[k].accent) mergedObj[k].accent = parsed[k].accent;
-            if (parsed[k].soft) mergedObj[k].soft = parsed[k].soft;
+      const ver = localStorage.getItem('fm_state_ver');
+      if (ver === '5.0') {
+        const saved = localStorage.getItem('fm_modes');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+            const mergedObj: Record<string, ModeDetail> = {};
+            Object.keys(parsed).forEach((k) => {
+              const def = DEFAULT_MODES[k];
+              mergedObj[k] = {
+                title: parsed[k]?.title || def?.title || k,
+                accent: parsed[k]?.accent || def?.accent || 'rgba(30, 140, 255, 0.9)',
+                soft: parsed[k]?.soft || def?.soft || 'rgba(60, 170, 255, 0.18)',
+                defaultAccent: parsed[k]?.defaultAccent || def?.defaultAccent || 'rgba(30, 140, 255, 0.9)',
+                defaultSoft: parsed[k]?.defaultSoft || def?.defaultSoft || 'rgba(60, 170, 255, 0.18)',
+                options: Array.isArray(parsed[k]?.options) && parsed[k].options.length > 0 ? parsed[k].options : (def?.options || []),
+              };
+            });
+            if (Object.keys(mergedObj).length > 0) return mergedObj;
           }
-        });
-        return mergedObj;
+        }
       }
     } catch (e) {}
     return DEFAULT_MODES;
@@ -614,18 +1240,33 @@ export default function App() {
   // Mode customizer icons assignment
   const [iconAssignments, setIconAssignments] = useState<Record<string, string>>(() => {
     try {
-      const saved = localStorage.getItem('fm_icons');
+      const ver = localStorage.getItem('fm_state_ver');
+      if (ver === '5.0') {
+        const saved = localStorage.getItem('fm_icons');
+        if (saved) {
+          return JSON.parse(saved);
+        }
+      }
+    } catch (e) {}
+    return {
+      business: 'candlestick',
+      life: 'stop_loss',
+      pc: 'smart_money',
+      sync: 'instant_execution',
+      alerts: 'trade_journal',
+    };
+  });
+
+  // Custom uploaded icons state
+  const iconFileInputRef = useRef<HTMLInputElement>(null);
+  const [customIcons, setCustomIcons] = useState<Record<string, { label: string; src: string; format: 'svg' | 'png' }>>(() => {
+    try {
+      const saved = localStorage.getItem('fm_custom_icons');
       if (saved) {
         return JSON.parse(saved);
       }
     } catch (e) {}
-    return {
-      target: 'target',
-      candle: 'candle',
-      dollar: 'dollar',
-      sync: 'shield',
-      alerts: 'bell',
-    };
+    return {};
   });
 
   // Scale tracking (from localStorage)
@@ -650,6 +1291,18 @@ export default function App() {
   const [titleInputValue, setTitleInputValue] = useState<string>('');
   const [editingItemIdx, setEditingItemIdx] = useState<number | null>(null);
   const [editingItemValue, setEditingItemValue] = useState<string>('');
+
+  // Mode completion water splash state
+  const [completedSplashMode, setCompletedSplashMode] = useState<string | null>(null);
+  const splashTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const triggerCompletedSplash = (modeKey: string) => {
+    if (splashTimerRef.current) clearTimeout(splashTimerRef.current);
+    setCompletedSplashMode(modeKey);
+    splashTimerRef.current = setTimeout(() => {
+      setCompletedSplashMode(null);
+    }, 3000);
+  };
 
   // Auto Updater State
   const [updateAvailable, setUpdateAvailable] = useState<boolean>(false);
@@ -707,9 +1360,15 @@ export default function App() {
         curr.closest('button') ||
         curr.closest('input') ||
         curr.closest('.icon-btn') ||
+        curr.closest('.icon-wrap') ||
+        curr.closest('.mode-drag-handle') ||
         curr.closest('.edit-toggle') ||
         curr.closest('.settings-toggle') ||
         curr.closest('#settings-panel') ||
+        curr.closest('.icon-picker') ||
+        curr.closest('.settings-body') ||
+        curr.closest('.setting-section') ||
+        curr.closest('.wallpaper-opacity-slider') ||
         curr.closest('.countdown-timer') ||
         curr.closest('.countdown-timer-edit') ||
         curr.closest('#countdown-timer-widget') ||
@@ -731,6 +1390,71 @@ export default function App() {
       curr = curr.parentElement;
     }
     return true;
+  };
+
+  const handleModePointerDown = (e: React.PointerEvent, mKey: string, mIdx: number) => {
+    if (!editMode) return;
+    if (e.button !== 0) return;
+    e.stopPropagation();
+
+    const startX = e.clientX;
+    isDraggingModeRef.current = false;
+
+    setModeDragState({
+      activeKey: mKey,
+      fromIdx: mIdx,
+      currentIdx: mIdx,
+      startX,
+      currentX: startX,
+    });
+
+    const modeKeys = Object.keys(modes);
+    const totalCount = modeKeys.length;
+    const itemWidth = 58; // 50px icon width + 8px gap
+
+    const onPointerMove = (moveEv: PointerEvent) => {
+      const deltaX = moveEv.clientX - startX;
+      if (Math.abs(deltaX) > 4) {
+        isDraggingModeRef.current = true;
+      }
+
+      const rawStep = Math.round(deltaX / itemWidth);
+      const targetIdx = Math.max(0, Math.min(totalCount - 1, mIdx + rawStep));
+
+      setModeDragState({
+        activeKey: mKey,
+        fromIdx: mIdx,
+        currentIdx: targetIdx,
+        startX,
+        currentX: moveEv.clientX,
+      });
+    };
+
+    const onPointerUp = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+
+      setModeDragState((prev) => {
+        if (prev) {
+          if (prev.currentIdx !== prev.fromIdx) {
+            moveMode(prev.fromIdx, prev.currentIdx);
+          }
+          setEditingTitle(false);
+          setEditingItemIdx(null);
+          setCurrentMode(prev.activeKey);
+        }
+        return null;
+      });
+
+      setTimeout(() => {
+        isDraggingModeRef.current = false;
+      }, 100);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
   };
 
   const handleCardPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -755,15 +1479,13 @@ export default function App() {
       const dy = moveEv.clientY - startY;
 
       if (!isDraggingActive) {
-        // If they move too much before the long press completes, cancel the timer
-        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
-          if (dragPointerRef.current.timer) {
-            clearTimeout(dragPointerRef.current.timer);
-            dragPointerRef.current.timer = null;
-          }
-          cleanup();
+        if (Math.hypot(dx, dy) >= 3) {
+          isDraggingActive = true;
+          setIsGripped(true);
+          dragPointerRef.current.dragging = true;
+        } else {
+          return;
         }
-        return;
       }
 
       setTranslate({
@@ -773,11 +1495,6 @@ export default function App() {
     };
 
     const onPointerUp = () => {
-      if (dragPointerRef.current.timer) {
-        clearTimeout(dragPointerRef.current.timer);
-        dragPointerRef.current.timer = null;
-      }
-
       if (isDraggingActive) {
         isDraggingActive = false;
         setIsGripped(false);
@@ -796,14 +1513,6 @@ export default function App() {
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('pointercancel', onPointerUp);
     };
-
-    // 250ms long press trigger
-    dragPointerRef.current.timer = setTimeout(() => {
-      isDraggingActive = true;
-      setIsGripped(true);
-      dragPointerRef.current.dragging = true;
-      playSoundChime('check');
-    }, 250);
 
     window.addEventListener('pointermove', onPointerMove, { passive: true });
     window.addEventListener('pointerup', onPointerUp, { passive: true });
@@ -854,13 +1563,29 @@ export default function App() {
   useEffect(() => {
     // Clear stale old states if any config mismatch from legacy assets
     const ver = localStorage.getItem('fm_state_ver');
-    if (ver !== '3.1') {
+    if (ver !== '5.1') {
       localStorage.removeItem('fm_modes');
       localStorage.removeItem('fm_theme');
       localStorage.removeItem('fm_scale');
       localStorage.removeItem('fm_icons');
       Object.keys(DEFAULT_MODES).forEach((m) => localStorage.removeItem('fm_sel_' + m));
-      localStorage.setItem('fm_state_ver', '3.1');
+      localStorage.setItem('fm_state_ver', '5.1');
+      setModes(DEFAULT_MODES);
+      setSelections({
+        business: [],
+        life: [],
+        pc: [],
+        sync: [],
+        alerts: [],
+      });
+      setIconAssignments({
+        business: 'candlestick',
+        life: 'stop_loss',
+        pc: 'smart_money',
+        sync: 'instant_execution',
+        alerts: 'trade_journal',
+      });
+      setCurrentMode('business');
     }
 
     // Determine stored Theme
@@ -915,6 +1640,10 @@ export default function App() {
   }, [iconAssignments]);
 
   useEffect(() => {
+    localStorage.setItem('fm_custom_icons', JSON.stringify(customIcons));
+  }, [customIcons]);
+
+  useEffect(() => {
     localStorage.setItem('fm_scale', scale.toString());
   }, [scale]);
 
@@ -957,45 +1686,15 @@ export default function App() {
         img.crossOrigin = 'anonymous';
         img.src = overdeskLogo;
         img.onload = () => {
-          try {
-            const canvas = document.createElement('canvas');
-            canvas.width = 48;
-            canvas.height = 48;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              ctx.clearRect(0, 0, 48, 48);
-              
-              // Auto-calculate exact aspect ratio proportions to prevent stretching
-              const imgAspect = img.width / img.height || 1.0;
-              let drawWidth = 48;
-              let drawHeight = 48;
-
-              if (imgAspect > 1.0) { // wider than tall
-                drawWidth = 48;
-                drawHeight = 48 / imgAspect;
-              } else { // taller than wide or square
-                drawHeight = 48;
-                drawWidth = 48 * imgAspect;
-              }
-
-              // We apply a zoom/scale-up factor (1.45x) to crop the inner transparency and make the logo appear significantly bigger in the OS task bar / tray
-              const zoomFactor = 1.45;
-              const finalW = drawWidth * zoomFactor;
-              const finalH = drawHeight * zoomFactor;
-              const finalX = (48 - finalW) / 2;
-              const finalY = (48 - finalH) / 2;
-
-              ctx.imageSmoothingEnabled = true;
-              ctx.imageSmoothingQuality = 'high';
-              ctx.drawImage(img, finalX, finalY, finalW, finalH);
-
-              const dataUrl = canvas.toDataURL('image/png');
-              if ((window as any).electronAPI && typeof (window as any).electronAPI.saveIcon === 'function') {
-                (window as any).electronAPI.saveIcon(dataUrl);
-              }
-            }
-          } catch (onloadErr) {
-            console.error('Error rendering dynamic logo in onload handler:', onloadErr);
+          const canvas = document.createElement('canvas');
+          canvas.width = 256;
+          canvas.height = 256;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.clearRect(0, 0, 256, 256);
+            ctx.drawImage(img, 0, 0, 256, 256);
+            const dataUrl = canvas.toDataURL('image/png');
+            (window as any).electronAPI.saveIcon(dataUrl);
           }
         };
         img.onerror = (err) => {
@@ -1150,7 +1849,14 @@ export default function App() {
         setLicenseAPIErrorText('');
       } else {
         setLicenseError(true);
-        setLicenseAPIErrorText(resp.error || 'Verification failed. Please double-check your key.');
+        const err = resp.error || '';
+        if (err.includes('refunded')) {
+          setLicenseAPIErrorText('This license has been refunded and is no longer valid.');
+        } else if (err.includes('already activated') || err.includes('another device')) {
+          setLicenseAPIErrorText('This license key is already activated on another device. Contact support to transfer.');
+        } else {
+          setLicenseAPIErrorText('Invalid Key, get key from Gumroad');
+        }
       }
     } else {
       // Fallback bypass mode on standard web preview
@@ -1161,14 +1867,13 @@ export default function App() {
 
   // ── Switch Active Tab Tab Modes ──
   const handleModeIconClick = (mode: string) => {
+    setEditingTitle(false);
+    setEditingItemIdx(null);
+    setCurrentMode(mode);
     if (editMode) {
       // Toggle mode visual configuration overlay
       setPickerTargetMode(mode);
       setPickerOpen(true);
-    } else {
-      setEditingTitle(false);
-      setEditingItemIdx(null);
-      setCurrentMode(mode);
     }
   };
 
@@ -1186,23 +1891,71 @@ export default function App() {
       return;
     }
 
-    let activeList = selections[currentMode] || [];
-    let updated: number[];
-    if (activeList.includes(idx)) {
-      updated = activeList.filter((v) => v !== idx);
+    const currentOptions = [...(modes[currentMode]?.options || [])];
+    const activeList = [...(selections[currentMode] || [])];
+    const isCurrentlyChecked = activeList.includes(idx);
+
+    let updatedSelections: number[];
+    let updatedOptions = currentOptions;
+
+    if (isCurrentlyChecked) {
+      // Unchecking item
       playSoundChime('check');
+
+      if (moveCheckedToBottom) {
+        const itemText = updatedOptions[idx];
+        updatedOptions.splice(idx, 1);
+
+        const remainingCheckedIndices = activeList.filter((v) => v !== idx);
+        const uncheckedCount = updatedOptions.length - remainingCheckedIndices.length;
+        const insertIdx = Math.max(0, uncheckedCount);
+
+        updatedOptions.splice(insertIdx, 0, itemText);
+
+        updatedSelections = remainingCheckedIndices.map((oldSel) => {
+          let pos = oldSel > idx ? oldSel - 1 : oldSel;
+          if (pos >= insertIdx) pos += 1;
+          return pos;
+        });
+      } else {
+        updatedSelections = activeList.filter((v) => v !== idx);
+      }
     } else {
-      updated = [...activeList, idx];
+      // Checking item
       playSoundChime('check');
-      const totalOptionsCount = modes[currentMode].options.length;
-      if (updated.length === totalOptionsCount) {
+
+      if (moveCheckedToBottom) {
+        const itemText = updatedOptions[idx];
+        updatedOptions.splice(idx, 1);
+        updatedOptions.push(itemText);
+        const newIndex = updatedOptions.length - 1;
+
+        updatedSelections = activeList.map((oldSel) => (oldSel > idx ? oldSel - 1 : oldSel));
+        updatedSelections.push(newIndex);
+      } else {
+        updatedSelections = [...activeList, idx];
+      }
+
+      const totalOptionsCount = updatedOptions.length;
+      if (updatedSelections.length === totalOptionsCount && totalOptionsCount > 0) {
         setTimeout(() => playSoundChime('complete'), 150);
+        triggerCompletedSplash(currentMode);
       }
     }
 
-    const nextSelections = { ...selections, [currentMode]: updated };
+    if (moveCheckedToBottom) {
+      setModes((prev) => ({
+        ...prev,
+        [currentMode]: {
+          ...prev[currentMode],
+          options: updatedOptions,
+        },
+      }));
+    }
+
+    const nextSelections = { ...selections, [currentMode]: updatedSelections };
     setSelections(nextSelections);
-    localStorage.setItem('fm_sel_' + currentMode, JSON.stringify(updated));
+    localStorage.setItem('fm_sel_' + currentMode, JSON.stringify(updatedSelections));
   };
 
   // ── Reset entire checklist indices ──
@@ -1310,6 +2063,70 @@ export default function App() {
     }, 60);
   };
 
+  // ── Re-order modes sequence ──
+  const moveMode = (fromIdx: number, toIdx: number) => {
+    const keys = Object.keys(modes);
+    if (fromIdx < 0 || fromIdx >= keys.length || toIdx < 0 || toIdx >= keys.length || fromIdx === toIdx) return;
+
+    const newKeys = [...keys];
+    const [movedKey] = newKeys.splice(fromIdx, 1);
+    newKeys.splice(toIdx, 0, movedKey);
+
+    const updatedModes: Record<string, ModeDetail> = {};
+    newKeys.forEach((k) => {
+      updatedModes[k] = modes[k];
+    });
+
+    setModes(updatedModes);
+    localStorage.setItem('fm_modes', JSON.stringify(updatedModes));
+    localStorage.setItem('fm_state_ver', '4.0');
+  };
+
+  // ── Re-order checklist options within active mode ──
+  const moveOption = (fromIdx: number, toIdx: number) => {
+    if (!currentMode || !modes[currentMode]) return;
+    const oldOptions = [...modes[currentMode].options];
+    if (fromIdx < 0 || fromIdx >= oldOptions.length || toIdx < 0 || toIdx >= oldOptions.length || fromIdx === toIdx) return;
+
+    const newOptions = [...oldOptions];
+    const [movedItem] = newOptions.splice(fromIdx, 1);
+    newOptions.splice(toIdx, 0, movedItem);
+
+    const updatedModes = {
+      ...modes,
+      [currentMode]: {
+        ...modes[currentMode],
+        options: newOptions,
+      },
+    };
+    setModes(updatedModes);
+    localStorage.setItem('fm_modes', JSON.stringify(updatedModes));
+    localStorage.setItem('fm_state_ver', '4.0');
+
+    // Remap selections array for current mode so checked state stays with item text
+    const oldSel = selections[currentMode] || [];
+    const newSel: number[] = [];
+
+    oldSel.forEach((idx) => {
+      if (idx === fromIdx) {
+        newSel.push(toIdx);
+      } else if (fromIdx < toIdx && idx > fromIdx && idx <= toIdx) {
+        newSel.push(idx - 1);
+      } else if (fromIdx > toIdx && idx >= toIdx && idx < fromIdx) {
+        newSel.push(idx + 1);
+      } else {
+        newSel.push(idx);
+      }
+    });
+
+    const updatedSelections = {
+      ...selections,
+      [currentMode]: newSel,
+    };
+    setSelections(updatedSelections);
+    localStorage.setItem('fm_sel_' + currentMode, JSON.stringify(newSel));
+  };
+
   // ── Mode customized color-picker operations ──
   const assignModeColor = (targetMode: string, accent: string, soft: string) => {
     setModes((prev) => ({
@@ -1334,6 +2151,130 @@ export default function App() {
     }));
     setPickerOpen(false);
     setPickerTargetMode(null);
+  };
+
+  // Custom Icon File Upload Handler
+  const handleCustomIconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const isSvg = file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg');
+    const labelName = file.name.replace(/\.[^/.]+$/, '').slice(0, 10) || 'Custom';
+    const reader = new FileReader();
+
+    if (isSvg) {
+      reader.readAsText(file);
+      reader.onload = (evt) => {
+        const content = evt.target?.result as string;
+        if (content && content.includes('<svg')) {
+          const customKey = 'custom_' + Date.now();
+          setCustomIcons((prev) => ({
+            ...prev,
+            [customKey]: {
+              label: labelName,
+              src: content,
+              format: 'svg',
+            },
+          }));
+          if (pickerTargetMode) {
+            assignModeIcon(pickerTargetMode, customKey);
+          }
+          playSoundChime('check');
+        } else {
+          // Fallback to Data URL
+          const urlReader = new FileReader();
+          urlReader.readAsDataURL(file);
+          urlReader.onload = (dataEvt) => {
+            const dataUrl = dataEvt.target?.result as string;
+            if (dataUrl) {
+              const customKey = 'custom_' + Date.now();
+              setCustomIcons((prev) => ({
+                ...prev,
+                [customKey]: {
+                  label: labelName,
+                  src: dataUrl,
+                  format: 'png',
+                },
+              }));
+              if (pickerTargetMode) {
+                assignModeIcon(pickerTargetMode, customKey);
+              }
+              playSoundChime('check');
+            }
+          };
+        }
+      };
+    } else {
+      reader.readAsDataURL(file);
+      reader.onload = (evt) => {
+        const dataUrl = evt.target?.result as string;
+        if (dataUrl) {
+          const customKey = 'custom_' + Date.now();
+          setCustomIcons((prev) => ({
+            ...prev,
+            [customKey]: {
+              label: labelName,
+              src: dataUrl,
+              format: 'png',
+            },
+          }));
+          if (pickerTargetMode) {
+            assignModeIcon(pickerTargetMode, customKey);
+          }
+          playSoundChime('check');
+        }
+      };
+    }
+
+    if (e.target) {
+      e.target.value = '';
+    }
+  };
+
+  const deleteCustomIcon = (e: React.MouseEvent, customKey: string) => {
+    e.stopPropagation();
+    setCustomIcons((prev) => {
+      const updated = { ...prev };
+      delete updated[customKey];
+      return updated;
+    });
+    setIconAssignments((prev) => {
+      const updated = { ...prev };
+      Object.keys(updated).forEach((mKey) => {
+        if (updated[mKey] === customKey) {
+          updated[mKey] = mKey === 'business' ? 'briefcase' : 'home';
+        }
+      });
+      return updated;
+    });
+    playSoundChime('reset');
+  };
+
+  // Helper renderer for built-in or custom icons
+  const renderIcon = (iconKey: string) => {
+    if (iconKey && customIcons[iconKey]) {
+      const item = customIcons[iconKey];
+      if (item.format === 'svg' && item.src.trim().startsWith('<svg')) {
+        return (
+          <span
+            className="custom-svg-icon"
+            style={{ display: 'inline-flex', width: '22px', height: '22px', alignItems: 'center', justifyContent: 'center' }}
+            dangerouslySetInnerHTML={{ __html: item.src }}
+          />
+        );
+      }
+      return (
+        <img
+          src={item.src}
+          alt={item.label || 'Custom'}
+          style={{ width: '22px', height: '22px', objectFit: 'contain', display: 'block' }}
+        />
+      );
+    }
+    if (iconKey && ICON_LIBRARY[iconKey]?.svg) {
+      return ICON_LIBRARY[iconKey].svg;
+    }
+    return ICON_LIBRARY.candlestick?.svg || ICON_LIBRARY.stop_loss?.svg;
   };
 
   const triggerAppShutdown = () => {
@@ -1409,35 +2350,24 @@ export default function App() {
     <div
       className="app-container"
       style={{
-        width: '460px',
+        width: '440px',
         height: '100%',
         transform: `scale(${scale})`,
         transformOrigin: 'top center',
         display: 'flex',
         alignItems: 'flex-start',
         justifyContent: 'center',
-        paddingTop: '0px',
+        padding: '30px 60px 60px 60px',
         background: 'transparent',
         position: 'relative',
         overflow: 'visible',
       }}
     >
-      {/* Main checklist canvas card widget with BorderGlow */}
-      <BorderGlow
+      {/* Main checklist canvas card widget */}
+      <div
+        className={`card ${isLight ? 'light' : ''} ${minimized ? 'minimized' : ''} ${isGripped ? 'gripped' : ''} ${!licenseActive ? 'license-mode' : ''}`}
+        id="card"
         ref={cardRef}
-        className={`card-glow-wrapper ${minimized ? 'minimized' : ''} ${isLight ? 'light' : ''}`}
-        edgeSensitivity={30}
-        glowColor={isLight ? "240 50% 70%" : "268 80% 65%"}
-        backgroundColor={isLight ? (activeApp === 'calendar' ? "rgba(235, 244, 255, 0.95)" : "rgba(245, 245, 250, 0.98)") : "rgba(3, 5, 20, 0.95)"}
-        borderRadius={36}
-        glowRadius={50}
-        glowIntensity={1.0}
-        coneSpread={25}
-        animated={false}
-        colors={isLight 
-          ? ['#818cf8', '#ca8a04', '#10b981'] 
-          : ['#c084fc', '#f472b6', '#38bdf8']
-        }
         onPointerDown={handleCardPointerDown}
         onPointerMove={handleCardPointerMove}
         onPointerUp={handleCardPointerUp}
@@ -1445,39 +2375,81 @@ export default function App() {
         onDragStart={(e) => e.preventDefault()}
         style={{
           transform: `translate(${translate.x}px, ${translate.y}px) scale(${isGripped ? 1.035 : 1})`,
+          boxShadow: !licenseActive ? 'none' : (isGripped ? `0 20px 50px -5px ${modes[currentMode]?.soft || 'var(--accent-soft)'}, 0 8px 24px -2px rgba(0, 0, 0, 0.45)` : undefined),
           transition: isGripped ? 'transform 0s, box-shadow 0.2s ease' : 'transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, padding 0.35s cubic-bezier(0.4, 0, 0.2, 1), min-height 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
           cursor: isGripped ? 'grabbing' : undefined,
-          minHeight: (settingsOpen && !minimized) ? '390px' : undefined,
-          boxShadow: !licenseActive ? 'none' : (isGripped ? (isLight ? '0 24px 64px -6px rgba(15, 23, 42, 0.12), 0 12px 24px -8px rgba(15, 23, 42, 0.08)' : `0 18px 50px 5px ${modes[currentMode]?.soft || 'var(--accent-soft)'}, 0 6px 18px rgba(0, 0, 0, 0.45)`) : undefined),
-          background: (isLight && activeApp === 'calendar')
-            ? 'linear-gradient(135deg, rgba(246, 251, 255, 0.98) 0%, rgba(232, 244, 255, 0.95) 100%)'
-            : undefined
+          minHeight: (settingsOpen && !minimized) ? '420px' : undefined,
+          position: 'relative',
+          overflow: 'hidden',
         }}
       >
-        <div
-          className={`card ${isLight ? 'light' : ''} ${minimized ? 'minimized' : ''} ${isGripped ? 'gripped' : ''} ${!licenseActive ? 'license-mode' : ''}`}
-          id="card"
-          style={{
-            width: '100%',
-            height: '100%',
-            background: 'transparent',
-            border: 'none',
-            boxShadow: 'none',
-            padding: 0,
-            margin: 0,
-          }}
-        >
+        {/* Wallpaper Background Layer */}
+        {wallpaperUrl && (
+          <div
+            className="wallpaper-layer"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              borderRadius: '28px',
+              overflow: 'hidden',
+              opacity: !licenseActive ? Math.min((wallpaperOpacity / 100) * 0.75, 0.6) : (wallpaperOpacity / 100),
+              zIndex: 0,
+              pointerEvents: 'none',
+              transition: 'opacity 0.25s ease',
+            }}
+          >
+            {isVideoUrl(wallpaperUrl) ? (
+              <>
+                <video
+                  src={wallpaperUrl}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    position: 'absolute',
+                    inset: 0,
+                  }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: isLight
+                      ? 'linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.58) 100%)'
+                      : 'linear-gradient(180deg, rgba(0, 0, 0, 0.32) 0%, rgba(0, 0, 0, 0.55) 100%)',
+                  }}
+                />
+              </>
+            ) : (
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  backgroundImage: `linear-gradient(180deg, ${isLight ? 'rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.58) 100%' : 'rgba(0, 0, 0, 0.32) 0%, rgba(0, 0, 0, 0.55) 100%'}), url("${wallpaperUrl}")`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                }}
+              />
+            )}
+          </div>
+        )}
+
         {!licenseActive ? (
-          <div className="license-card-inner" style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', boxSizing: 'border-box', padding: '16px 8px' }}>
+          <div className="license-card-inner">
             <img 
               className="license-logo" 
               src={overdeskLogo} 
-              alt="Overdesk Nexus Logo" 
-              style={{ width: '80px', height: '100px', objectFit: 'contain', marginBottom: '16px' }}
+              alt="Overdesk Checklist Logo" 
+              style={{ width: '88px', height: '88px', objectFit: 'contain', marginBottom: '2px' }}
               referrerPolicy="no-referrer"
             />
-            <div className="license-title" style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text)' }}>Overdesk Nexus</div>
-            <div className="license-sub" style={{ fontSize: '11px', color: 'var(--text-mid)', textAlign: 'center', lineHeight: '1.4' }}>
+            <div className="license-title">Overdesk Checklist 2.0</div>
+            <div className="license-sub">
               Enter your license key to activate.
               <br />
               Find your license key inside your Gumroad purchase receipt.
@@ -1493,14 +2465,14 @@ export default function App() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') attemptActivation();
               }}
-              style={{ width: '100%' }}
             />
             {licenseAPIErrorText && (
               <div 
                 className="license-api-feedback"
                 style={{
-                  fontSize: '11px',
-                  color: licenseError ? '#ff4d4d' : '#00ccff',
+                  fontSize: '11.5px',
+                  fontWeight: '600',
+                  color: licenseError ? '#ff4d4d' : (isLight ? '#0284c7' : '#38bdf8'),
                   textAlign: 'center',
                   marginTop: '-4px',
                   marginBottom: '4px',
@@ -1512,13 +2484,13 @@ export default function App() {
                 {licenseAPIErrorText}
               </div>
             )}
-            <button className="license-btn" onClick={attemptActivation} style={{ width: '100%' }}>
+            <button className="license-btn" onClick={attemptActivation}>
               Activate
             </button>
             
-            <div className="license-hint" style={{ fontSize: '11px', marginTop: '12px', textAlign: 'center' }}>
-              <span style={{ color: 'rgba(255,255,255,0.4)' }}>
-                Get your license key on Gumroad: <a href="https://overdesk.gumroad.com/l/app3" target="_blank" rel="noreferrer" style={{ color: '#00ccff', textDecoration: 'underline' }}>overdesk.gumroad.com/l/app3</a>
+            <div className="license-hint">
+              <span>
+                Get your license key on Gumroad: <a href="https://overdesk.gumroad.com/l/app3" target="_blank" rel="noreferrer">overdesk.gumroad.com/l/app3</a>
               </span>
             </div>
           </div>
@@ -1537,43 +2509,41 @@ export default function App() {
 
         {/* Top Header Controls row */}
         <div className="top-bar" id="top-bar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {/* Left Theme toggle button */}
+          {/* Left Theme toggle button */}
+          <div
+            className="theme-switch"
+            id="theme-switch"
+            onClick={() => {
+              setIsLight(!isLight);
+              localStorage.setItem('fm_theme', !isLight ? '1' : '0');
+            }}
+          >
             <div
-              className="theme-switch"
-              id="theme-switch"
-              onClick={() => {
-                setIsLight(!isLight);
-                localStorage.setItem('fm_theme', !isLight ? '1' : '0');
+              className="theme-switch-knob"
+              id="theme-knob"
+              style={{
+                transform: isLight ? 'translateX(18px)' : 'translateX(0px)',
               }}
             >
-              <div
-                className="theme-switch-knob"
-                id="theme-knob"
-                style={{
-                  transform: isLight ? 'translateX(18px)' : 'translateX(0px)',
-                }}
-              >
-                {isLight ? (
-                  // Moon Icon
-                  <svg id="theme-icon" viewBox="0 0 24 24">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                  </svg>
-                ) : (
-                  // Sun Icon
-                  <svg id="theme-icon" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="5" />
-                    <line x1="12" y1="1" x2="12" y2="3" />
-                    <line x1="12" y1="21" x2="12" y2="23" />
-                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                    <line x1="1" y1="12" x2="3" y2="12" />
-                    <line x1="21" y1="12" x2="23" y2="12" />
-                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-                  </svg>
-                )}
-              </div>
+              {isLight ? (
+                // Moon Icon
+                <svg id="theme-icon" viewBox="0 0 24 24">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+              ) : (
+                // Sun Icon
+                <svg id="theme-icon" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="5" />
+                  <line x1="12" y1="1" x2="12" y2="3" />
+                  <line x1="12" y1="21" x2="12" y2="23" />
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                  <line x1="1" y1="12" x2="3" y2="12" />
+                  <line x1="21" y1="12" x2="23" y2="12" />
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                </svg>
+              )}
             </div>
           </div>
 
@@ -1595,233 +2565,358 @@ export default function App() {
 
           {/* Right toggle configurations */}
           <div className="top-bar-right">
-            {activeApp === 'checklist' && (
-              <>
-                {/* Switch to FX Economic Calendar (at the front / leftmost) */}
-                <button
-                  onClick={() => {
-                    if (minimized) setMinimized(false);
-                    setActiveApp('calendar');
-                  }}
-                  style={{
-                    background: isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)',
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: '30px',
-                    height: '30px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    color: isLight ? '#4f46e5' : '#818cf8',
-                    transition: 'all 0.15s ease-in-out',
-                    padding: 0,
-                    margin: 0,
-                  }}
-                  title="Switch to FX Economic Calendar"
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'scale(1.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)';
-                  }}
-                >
-                  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2.0" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                    {/* Portal bracket on left */}
-                    <path d="M12 6H8a5 5 0 0 0-5 5v2a5 5 0 0 0 5 5h4" />
-                    {/* Transit arrow pointing right */}
-                    <line x1="7" y1="12" x2="21" y2="12" />
-                    <polyline points="16 7 21 12 16 17" />
-                  </svg>
-                </button>
+          {activeApp === 'checklist' && (
+            <>
+              <button
+                onClick={() => {
+                  if (minimized) setMinimized(false);
+                  setActiveApp('calendar');
+                }}
+                style={{
+                  background: isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '30px',
+                  height: '30px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: isLight ? '#4f46e5' : '#818cf8',
+                  transition: 'all 0.15s ease-in-out',
+                  padding: 0,
+                  margin: 0,
+                }}
+                title="Switch to FX Economic Calendar"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2.0" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 6H8a5 5 0 0 0-5 5v2a5 5 0 0 0 5 5h4" />
+                  <line x1="7" y1="12" x2="21" y2="12" />
+                  <polyline points="16 7 21 12 16 17" />
+                </svg>
+              </button>
 
-                {/* Edit Button (in the middle / second position) */}
-                <button
-                  className={`edit-toggle ${editMode ? 'on' : ''}`}
-                  id="edit-toggle"
-                  onClick={() => {
-                    if (minimized) setMinimized(false);
-                    setEditMode(!editMode);
-                    setSettingsOpen(false);
-                    setEditingTitle(false);
-                    setEditingItemIdx(null);
-                  }}
-                  title="Edit List Configurations"
-                >
-                  {editMode ? (
-                    // Checked Done Icon in edit mode
-                    <svg viewBox="0 0 24 24">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  ) : (
-                    // Pencil Icon in default view mode
-                    <svg viewBox="0 0 24 24">
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                    </svg>
-                  )}
-                </button>
+              <button className="close-btn" id="close-btn" onClick={triggerAppShutdown} title="Shutdown App">
+                <svg viewBox="0 0 24 24">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
 
-                {/* Shutdown / Close / Cancel Button (at the edge / far right position) */}
-                <button className="close-btn" id="close-btn" onClick={triggerAppShutdown} title="Shutdown App">
+              <button
+                className={`edit-toggle ${editMode ? 'on' : ''}`}
+                id="edit-toggle"
+                onClick={() => {
+                  if (minimized) setMinimized(false);
+                  setEditMode(!editMode);
+                  setSettingsOpen(false);
+                  setEditingTitle(false);
+                  setEditingItemIdx(null);
+                }}
+                title="Edit List Configurations"
+              >
+                {editMode ? (
                   <svg viewBox="0 0 24 24">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
+                    <polyline points="20 6 9 17 4 12" />
                   </svg>
-                </button>
-              </>
-            )}
-
-            {activeApp === 'calendar' && (
-              <>
-                {/* Cancel/Shutdown switch-back option */}
-                <button
-                  onClick={() => setActiveApp('checklist')}
-                  style={{
-                    background: isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)',
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: '30px',
-                    height: '30px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    color: isLight ? '#1a1a2e' : '#ffffff',
-                    transition: 'all 0.15s ease-in-out',
-                    padding: 0,
-                    margin: 0,
-                  }}
-                  title="Switch back to Checklist"
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'scale(1.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)';
-                  }}
-                >
-                  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2.0" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                    {/* Portal bracket on right */}
-                    <path d="M12 6h4a5 5 0 0 1 5 5v2a5 5 0 0 1-5 5h-4" />
-                    {/* Transit arrow pointing left */}
-                    <line x1="17" y1="12" x2="3" y2="12" />
-                    <polyline points="8 7 3 12 8 17" />
-                  </svg>
-                </button>
-
-                {/* Settings Gear Button */}
-                <button
-                  onClick={() => setCalendarSettingsOpen(!calendarSettingsOpen)}
-                  style={{
-                    background: calendarSettingsOpen 
-                      ? (isLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.22)') 
-                      : (isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)'),
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: '30px',
-                    height: '30px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    color: calendarSettingsOpen ? '#0082ff' : (isLight ? '#1a1a2e' : '#ffffff'),
-                    transition: 'all 0.15s ease-in-out',
-                    padding: 0,
-                    margin: 0,
-                  }}
-                  title={calendarSettingsOpen ? "Close Simulator Panel" : "Open Simulator & Advanced Settings"}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'scale(1.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)';
-                  }}
-                >
-                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{
-                    transform: calendarSettingsOpen ? 'scale(1.08)' : 'none',
-                    transition: 'transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)'
-                  }}>
-                    <line x1="4" y1="21" x2="4" y2="14" fill="none"></line>
-                    <line x1="4" y1="10" x2="4" y2="3" fill="none"></line>
-                    <line x1="12" y1="21" x2="12" y2="12" fill="none"></line>
-                    <line x1="12" y1="8" x2="12" y2="3" fill="none"></line>
-                    <line x1="20" y1="21" x2="20" y2="16" fill="none"></line>
-                    <line x1="20" y1="12" x2="20" y2="3" fill="none"></line>
-                    <line x1="2" y1="14" x2="6" y2="14" fill="none"></line>
-                    <line x1="10" y1="8" x2="14" y2="8" fill="none"></line>
-                    <line x1="18" y1="16" x2="22" y2="16" fill="none"></line>
-                  </svg>
-                </button>
-
-                {/* Cancel/Shutdown button (at the far right / 3rd position) */}
-                <button className="close-btn" id="close-btn" onClick={triggerAppShutdown} title="Shutdown App">
+                ) : (
                   <svg viewBox="0 0 24 24">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                   </svg>
-                </button>
-              </>
-            )}
-          </div>
+                )}
+              </button>
+            </>
+          )}
+
+          {activeApp === 'calendar' && (
+            <>
+              <button
+                onClick={() => setActiveApp('checklist')}
+                style={{
+                  background: isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '30px',
+                  height: '30px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: isLight ? '#1a1a2e' : '#ffffff',
+                  transition: 'all 0.15s ease-in-out',
+                  padding: 0,
+                  margin: 0,
+                }}
+                title="Switch back to Checklist"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2.0" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 6h4a5 5 0 0 1 5 5v2a5 5 0 0 1-5 5h-4" />
+                  <line x1="17" y1="12" x2="3" y2="12" />
+                  <polyline points="8 7 3 12 8 17" />
+                </svg>
+              </button>
+
+              <button
+                onClick={() => setCalendarSettingsOpen(!calendarSettingsOpen)}
+                style={{
+                  background: calendarSettingsOpen 
+                    ? (isLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.22)') 
+                    : (isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)'),
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '30px',
+                  height: '30px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: calendarSettingsOpen ? '#0082ff' : (isLight ? '#1a1a2e' : '#ffffff'),
+                  transition: 'all 0.15s ease-in-out',
+                  padding: 0,
+                  margin: 0,
+                }}
+                title={calendarSettingsOpen ? "Close Simulator Panel" : "Open Simulator & Advanced Settings"}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{
+                  transform: calendarSettingsOpen ? 'scale(1.08)' : 'none',
+                  transition: 'transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                }}>
+                  <line x1="4" y1="21" x2="4" y2="14" fill="none"></line>
+                  <line x1="4" y1="10" x2="4" y2="3" fill="none"></line>
+                  <line x1="12" y1="21" x2="12" y2="12" fill="none"></line>
+                  <line x1="12" y1="8" x2="12" y2="3" fill="none"></line>
+                  <line x1="20" y1="21" x2="20" y2="16" fill="none"></line>
+                  <line x1="20" y1="12" x2="20" y2="3" fill="none"></line>
+                  <line x1="2" y1="14" x2="6" y2="14" fill="none"></line>
+                  <line x1="10" y1="8" x2="14" y2="8" fill="none"></line>
+                  <line x1="18" y1="16" x2="22" y2="16" fill="none"></line>
+                </svg>
+              </button>
+
+              <button className="close-btn" id="close-btn" onClick={triggerAppShutdown} title="Shutdown App">
+                <svg viewBox="0 0 24 24">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </>
+          )}
         </div>
+        </div>
+        <div style={{ display: activeApp === 'checklist' ? 'contents' : 'none' }}>
 
-        {/* Tab mode selection icons row */}
-        {activeApp === 'checklist' && (
-          <div className="icons">
-            {Object.keys(modes).map((mKey) => {
-              const hasLiquidFill = selections[mKey]?.length > 0;
-              const isSelected = mKey === currentMode;
-              const waveParams = compileLiquidWaveData(mKey);
 
-              return (
-                <div className="icon-wrap" key={mKey}>
-                  {/* Dynamically calculated filling liquid SVG wave structure */}
-                  {hasLiquidFill && (
-                    <div className="liquid-container">
-                      <svg viewBox="0 0 50 50">
-                        <defs>
-                          <clipPath id={`lc-clip-${mKey}`}>
-                            <circle cx="25" cy="25" r="24.5" />
-                          </clipPath>
-                          <linearGradient id={`lc-grad-${mKey}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={waveParams.gradientHigh} />
-                            <stop offset="100%" stopColor={waveParams.baseColor} />
-                          </linearGradient>
-                        </defs>
-                        <g clipPath={`url(#lc-clip-${mKey})`}>
-                          {/* Underlay color rectangle */}
-                          <rect x="-15" y={waveParams.waterY} width="80" height={52 - waveParams.waterY} fill={waveParams.baseColor} />
-                          {/* Floating wave overlay using CSS math slosh animation */}
-                          <g style={{ animation: 'liquidBob 3.2s ease-in-out infinite' }}>
-                            <path
-                              style={{
-                                animation: 'liquidSlosh 3.8s ease-in-out infinite',
-                                transformOrigin: 'center center',
-                              }}
-                              d={waveParams.wavePath}
-                              fill={`url(#lc-grad-${mKey})`}
-                            />
-                          </g>
-                        </g>
-                      </svg>
-                    </div>
-                  )}
+        {/* Render Minimized Reminder View when minimized, or full Checklist View when expanded */}
+        {minimized ? (
+          <MinimizedReminderView
+            reminderText={reminderText}
+            isEditingReminder={isEditingReminder}
+            tempReminderText={tempReminderText}
+            isLight={isLight}
+            accentSoft={modes[currentMode]?.soft}
+            animateText={animateMinimizedText}
+            setTempReminderText={setTempReminderText}
+            setIsEditingReminder={setIsEditingReminder}
+            handleSaveReminder={handleSaveReminder}
+            getReminderFontSize={getReminderFontSize}
+          />
+        ) : (
+          <>
+            {/* Tab mode selection icons row */}
+            <div
+              className="icons"
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: '8px',
+                alignItems: 'center',
+                marginBottom: '16px',
+                flexShrink: 0,
+                width: '100%',
+                position: 'relative',
+                zIndex: 5,
+                padding: 0,
+                margin: 0,
+              }}
+            >
+              {Object.keys(modes).map((mKey, mIdx) => {
+                const hasLiquidFill = selections[mKey]?.length > 0;
+                const isSelected = mKey === currentMode;
+                const waveParams = compileLiquidWaveData(mKey);
+                const modeAccent = modes[mKey]?.accent || 'var(--accent)';
 
-                  <button
-                    className={`icon-btn ${isSelected ? 'active' : ''} ${hasLiquidFill ? 'has-liquid' : ''}`}
-                    data-mode={mKey}
-                    onClick={() => handleModeIconClick(mKey)}
+                let translateX = 0;
+                let isBeingDragged = false;
+
+                if (modeDragState) {
+                  if (modeDragState.activeKey === mKey) {
+                    isBeingDragged = true;
+                    translateX = modeDragState.currentX - modeDragState.startX;
+                  } else {
+                    const from = modeDragState.fromIdx;
+                    const current = modeDragState.currentIdx;
+                    if (mIdx > from && mIdx <= current) {
+                      translateX = -58;
+                    } else if (mIdx < from && mIdx >= current) {
+                      translateX = 58;
+                    }
+                  }
+                }
+
+                return (
+                  <div
+                    key={mKey}
+                    className={`icon-wrap ${completedSplashMode === mKey ? 'splash-active' : ''} ${isSelected ? 'active-mode' : 'inactive-mode'}`}
                     style={{
-                      backgroundColor: isSelected && !hasLiquidFill ? modes[mKey]?.accent : undefined,
-                    }}
+                      '--splash-color': modeAccent,
+                      position: 'relative',
+                      zIndex: isBeingDragged ? 20 : (isSelected ? 6 : 5),
+                      cursor: editMode ? 'grab' : 'pointer',
+                      opacity: 1,
+                      transform: `translateX(${translateX}px)`,
+                      transition: isBeingDragged ? 'none' : 'transform 0.22s cubic-bezier(0.2, 0, 0, 1)',
+                      userSelect: 'none',
+                      touchAction: 'none',
+                    } as React.CSSProperties}
+                    onPointerDown={(e) => handleModePointerDown(e, mKey, mIdx)}
                   >
-                    {ICON_LIBRARY[iconAssignments[mKey]]?.svg || ICON_LIBRARY.target.svg}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                    {/* Re-order Mode Drag Handle in Edit Mode (Grip Dots Only) */}
+                    {editMode && (
+                      <div
+                        className="mode-drag-handle"
+                        title="Drag to reorder mode"
+                        style={{
+                          position: 'absolute',
+                          top: '-11px',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: isLight ? 'rgba(255, 255, 255, 0.96)' : 'rgba(15, 23, 42, 0.96)',
+                          backdropFilter: 'blur(8px)',
+                          borderRadius: '999px',
+                          padding: '3px 7px',
+                          zIndex: 12,
+                          border: '1px solid ' + (isLight ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.25)'),
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                          color: isLight ? '#0f172a' : '#ffffff',
+                          cursor: 'grab',
+                          userSelect: 'none',
+                        }}
+                      >
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                          <circle cx="9" cy="6" r="1.5" />
+                          <circle cx="15" cy="6" r="1.5" />
+                          <circle cx="9" cy="12" r="1.5" />
+                          <circle cx="15" cy="12" r="1.5" />
+                          <circle cx="9" cy="18" r="1.5" />
+                          <circle cx="15" cy="18" r="1.5" />
+                        </svg>
+                      </div>
+                    )}
+                    <Glass
+                      isLight={isLight}
+                      className="mode-icon-glass"
+                      borderRadius={25}
+                      width={50}
+                      height={50}
+                      variant={isSelected ? "default" : "subtle"}
+                      backgroundOpacity={isSelected ? (isLight ? 0.35 : 0.18) : (isLight ? 0.15 : 0.08)}
+                      style={{
+                        borderRadius: '50%',
+                        transform: 'scale(1.0)',
+                        transition: 'box-shadow 0.25s ease, transform 0.25s ease',
+                        boxShadow: isSelected 
+                          ? `0 0 0 2px ${modeAccent}` 
+                          : '0 0 0 0px transparent',
+                        position: 'relative',
+                      }}
+                    >
+                      {hasLiquidFill && (
+                        <div className="liquid-container">
+                          <svg viewBox="0 0 50 50">
+                            <defs>
+                              <clipPath id={`lc-clip-${mKey}`}>
+                                <circle cx="25" cy="25" r="24.5" />
+                              </clipPath>
+                              <linearGradient id={`lc-grad-${mKey}`} x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor={waveParams.gradientHigh} />
+                                <stop offset="100%" stopColor={waveParams.baseColor} />
+                              </linearGradient>
+                            </defs>
+                            <g clipPath={`url(#lc-clip-${mKey})`}>
+                              {/* Underlay color rectangle */}
+                              <rect x="-15" y={waveParams.waterY} width="80" height={52 - waveParams.waterY} fill={waveParams.baseColor} />
+                              {/* Floating wave overlay using CSS math slosh animation */}
+                              <g style={{ animation: 'liquidBob 3.2s ease-in-out infinite' }}>
+                                <path
+                                  style={{
+                                    animation: 'liquidSlosh 3.8s ease-in-out infinite',
+                                    transformOrigin: 'center center',
+                                  }}
+                                  d={waveParams.wavePath}
+                                  fill={`url(#lc-grad-${mKey})`}
+                                />
+                              </g>
+                            </g>
+                          </svg>
+                        </div>
+                      )}
+                      {completedSplashMode === mKey && (
+                        <div className="icon-splash-droplets">
+                          <span className="i-drop d1" style={{ backgroundColor: waveParams.gradientHigh }} />
+                          <span className="i-drop d2" style={{ backgroundColor: '#ffffff' }} />
+                          <span className="i-drop d3" style={{ backgroundColor: waveParams.gradientHigh }} />
+                          <span className="i-drop d4" style={{ backgroundColor: '#ffffff' }} />
+                          <span className="i-drop d5" style={{ backgroundColor: waveParams.gradientHigh }} />
+                        </div>
+                      )}
+                      <button
+                        className={`icon-btn ${isSelected ? 'active' : ''} ${hasLiquidFill ? 'has-liquid' : ''}`}
+                        data-mode={mKey}
+                        onClick={() => {
+                          if (!isDraggingModeRef.current) {
+                            handleModeIconClick(mKey);
+                          }
+                        }}
+                        style={{
+                          backgroundColor: !hasLiquidFill
+                            ? (isSelected ? (modes[mKey]?.accent || 'var(--accent)') : 'transparent')
+                            : 'transparent',
+                          border: 'none',
+                          boxShadow: 'none',
+                          width: '100%',
+                          height: '100%',
+                          transform: 'none',
+                        }}
+                      >
+                        {renderIcon(iconAssignments[mKey])}
+                      </button>
+                    </Glass>
+                  </div>
+                );
+              })}
+            </div>
 
         {/* Tab Mode configuration Picker overlay */}
         {pickerOpen && pickerTargetMode && (
@@ -1900,13 +2995,69 @@ export default function App() {
               </div>
             </div>
 
+            {/* Hidden File Input for Custom SVG / PNG Upload */}
+            <input
+              type="file"
+              ref={iconFileInputRef}
+              accept=".svg, .png, .jpg, .jpeg, .webp, image/svg+xml, image/png"
+              onChange={handleCustomIconUpload}
+              style={{ display: 'none' }}
+            />
+
             {/* Icon grid options list selector */}
             <div className="picker-grid">
+              {/* Custom Icon Upload Tile */}
+              <div
+                className="picker-item picker-upload"
+                title="Upload custom SVG or PNG icon file"
+                onClick={(e) => {
+                  triggerGooeyParticles(e.currentTarget, modes[pickerTargetMode]?.accent);
+                  iconFileInputRef.current?.click();
+                }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                <span>Upload SVG/PNG</span>
+              </div>
+
+              {/* Custom uploaded icons */}
+              {Object.entries(customIcons).map(([cKey, cDef]) => {
+                const item = cDef as { label: string; src: string; format: string };
+                return (
+                  <div
+                    className={`picker-item custom-picker-item ${iconAssignments[pickerTargetMode] === cKey ? 'current' : ''}`}
+                    key={cKey}
+                    onClick={(e) => {
+                      triggerGooeyParticles(e.currentTarget, modes[pickerTargetMode]?.accent);
+                      assignModeIcon(pickerTargetMode, cKey);
+                    }}
+                    style={{ position: 'relative' }}
+                  >
+                    <button
+                      className="picker-item-delete"
+                      title="Delete custom icon"
+                      onClick={(e) => deleteCustomIcon(e, cKey)}
+                    >
+                      ×
+                    </button>
+                    {renderIcon(cKey)}
+                    <span>{item.label}</span>
+                  </div>
+                );
+              })}
+
+              {/* Built-in icons */}
               {Object.entries(ICON_LIBRARY).map(([libKey, def]) => (
                 <div
                   className={`picker-item ${iconAssignments[pickerTargetMode] === libKey ? 'current' : ''}`}
                   key={libKey}
-                  onClick={() => assignModeIcon(pickerTargetMode, libKey)}
+                  onClick={(e) => {
+                    triggerGooeyParticles(e.currentTarget, modes[pickerTargetMode]?.accent);
+                    assignModeIcon(pickerTargetMode, libKey);
+                  }}
                 >
                   {def.svg}
                   <span>{def.label}</span>
@@ -1918,10 +3069,14 @@ export default function App() {
 
         {/* Global Settings Panel overlay */}
         {settingsOpen && (
-          <div className="icon-picker open" id="settings-panel">
-            <div className="picker-header">
-              <span className="picker-title">Settings</span>
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <div
+            className="icon-picker open no-drag"
+            id="settings-panel"
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="picker-header" style={{ flexDirection: 'column', alignItems: 'center', marginBottom: '4px', gap: '4px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
                 <button
                   className="picker-done"
                   onClick={() => setSettingsOpen(false)}
@@ -1934,171 +3089,527 @@ export default function App() {
                   Done
                 </button>
               </div>
+              <span className="picker-title" style={{ textAlign: 'center', fontSize: '11px', letterSpacing: '0.14em', fontWeight: 700 }}>Settings</span>
             </div>
 
-            <div className="settings-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '12px 8px 16px', overflowY: 'hidden', flex: 1 }}>
+            <div className="settings-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '6px 4px 16px', flex: 1, minHeight: 0 }}>
               <div className="setting-section" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <span className="setting-label" style={{ fontSize: '10px', color: isLight ? 'rgba(0,0,0,0.45)' : 'rgba(255, 255, 255, 0.45)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 'bold' }}>Window Scale</span>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', width: '100%' }}>
-                  {[2, 1.5, 1.2, 1, 0.7, 0.5].map((val) => {
-                    const isSelected = Math.abs(scale - val) < 0.01;
-                    const label = val === 2 ? 'x2'
-                                : val === 1.5 ? 'x1.5'
-                                : val === 1.2 ? 'x1.2'
-                                : val === 1 ? 'x1'
-                                : val === 0.7 ? 'x0.7'
-                                : 'x0.5';
-                    return (
-                      <button
-                        key={val}
-                        onClick={() => handleScaleChange(val)}
-                        className="scale-select-btn"
-                        style={{
-                          padding: '7px 4px',
-                          borderRadius: '12px',
-                          background: isSelected ? 'var(--accent)' : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)'),
-                          border: '1px solid ' + (isSelected ? 'var(--accent)' : 'transparent'),
-                          color: isSelected ? '#fff' : (isLight ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)'),
-                          fontWeight: '600',
-                          fontSize: '11px',
-                          cursor: 'pointer',
-                          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
-                        }}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
+                <span className="setting-label" style={{ fontSize: '9.5px', color: isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 'bold', textAlign: 'left' }}>Window Scale</span>
+                <GooeyNav
+                  items={[
+                    { label: 'x2', onClick: () => handleScaleChange(2) },
+                    { label: 'x1.5', onClick: () => handleScaleChange(1.5) },
+                    { label: 'x1.2', onClick: () => handleScaleChange(1.2) },
+                    { label: 'x1', onClick: () => handleScaleChange(1) },
+                    { label: 'x0.7', onClick: () => handleScaleChange(0.7) },
+                    { label: 'x0.5', onClick: () => handleScaleChange(0.5) },
+                  ]}
+                  activeIndex={[2, 1.5, 1.2, 1, 0.7, 0.5].findIndex((v) => Math.abs(scale - v) < 0.01)}
+                  particleCount={12}
+                  animationTime={450}
+                />
               </div>
 
               <div className="setting-section" style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--divider)', paddingTop: '10px' }}>
-                <span className="setting-label" style={{ fontSize: '10px', color: isLight ? 'rgba(0,0,0,0.45)' : 'rgba(255, 255, 255, 0.45)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 'bold' }}>Countdown Display</span>
+                <span className="setting-label" style={{ fontSize: '9.5px', color: isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 'bold', textAlign: 'left' }}>Countdown Display</span>
+                <GooeyNav
+                  items={[
+                    { label: 'Shown', onClick: () => handleShowCountdownChange(true) },
+                    { label: 'Hidden', onClick: () => handleShowCountdownChange(false) },
+                  ]}
+                  activeIndex={showCountdown ? 0 : 1}
+                  particleCount={12}
+                  animationTime={450}
+                />
+              </div>
+
+              <div className="setting-section" style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--divider)', paddingTop: '10px' }}>
+                <span className="setting-label" style={{ fontSize: '9.5px', color: isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 'bold', textAlign: 'left' }}>Completion Alarm</span>
+                <GooeyNav
+                  items={[
+                    { label: 'Alarm On', onClick: () => handleAlarmEnabledChange(true) },
+                    { label: 'Alarm Off', onClick: () => handleAlarmEnabledChange(false) },
+                  ]}
+                  activeIndex={alarmEnabled ? 0 : 1}
+                  particleCount={12}
+                  animationTime={450}
+                />
+              </div>
+
+              <div className="setting-section" style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--divider)', paddingTop: '10px' }}>
+                <span className="setting-label" style={{ fontSize: '9.5px', color: isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 'bold', textAlign: 'left' }}>App Animations</span>
+                <GooeyNav
+                  items={[
+                    { label: 'Enabled', onClick: () => handleAnimationsEnabledChange(true) },
+                    { label: 'Disabled', onClick: () => handleAnimationsEnabledChange(false) },
+                  ]}
+                  activeIndex={animationsEnabled ? 0 : 1}
+                  particleCount={animationsEnabled ? 12 : 0}
+                  animationTime={450}
+                />
+              </div>
+
+              <div className="setting-section" style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--divider)', paddingTop: '10px' }}>
+                <span className="setting-label" style={{ fontSize: '9.5px', color: isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 'bold', textAlign: 'left' }}>Move Checked to Bottom</span>
+                <GooeyNav
+                  items={[
+                    { label: 'Enabled', onClick: () => handleMoveCheckedToBottomChange(true) },
+                    { label: 'Disabled', onClick: () => handleMoveCheckedToBottomChange(false) },
+                  ]}
+                  activeIndex={moveCheckedToBottom ? 0 : 1}
+                  particleCount={12}
+                  animationTime={450}
+                />
+              </div>
+
+              <div className="setting-section" style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--divider)', paddingTop: '10px' }}>
+                <span className="setting-label" style={{ fontSize: '9.5px', color: isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 'bold', textAlign: 'left' }}>Minimized Text Animation</span>
+                <GooeyNav
+                  items={[
+                    { label: 'Animated', onClick: () => handleAnimateMinimizedTextChange(true) },
+                    { label: 'Static', onClick: () => handleAnimateMinimizedTextChange(false) },
+                  ]}
+                  activeIndex={animateMinimizedText ? 0 : 1}
+                  particleCount={12}
+                  animationTime={450}
+                />
+              </div>
+
+              {/* Wallpaper Background Settings */}
+              <div className="setting-section" style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--divider)', paddingTop: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span className="setting-label" style={{ fontSize: '9.5px', color: isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 'bold', textAlign: 'left' }}>
+                    Wallpaper Background
+                  </span>
+                  {wallpaperUrl && (
+                    <button
+                      onClick={() => handleWallpaperUrlChange('')}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#ff5252',
+                        fontSize: '10px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        padding: 0,
+                      }}
+                      title="Remove background wallpaper"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {/* Wallpaper Gallery (Presets + Custom Uploads) */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', width: '100%', maxHeight: '120px', overflowY: 'auto', paddingRight: '2px' }}>
+                  {(() => {
+                    const galleryWallpapers = [
+                      ...PRESET_WALLPAPERS.map((wp) => ({ ...wp, isCustom: false })),
+                      ...customWallpapers.map((url, idx) => ({
+                        id: `custom_wp_${idx}`,
+                        name: `Uploaded ${idx + 1}`,
+                        url,
+                        isCustom: true,
+                      })),
+                    ];
+
+                    if (wallpaperUrl && !galleryWallpapers.some((wp) => wp.url === wallpaperUrl)) {
+                      galleryWallpapers.push({
+                        id: 'active_custom_wp',
+                        name: 'Uploaded',
+                        url: wallpaperUrl,
+                        isCustom: true,
+                      });
+                    }
+
+                    return galleryWallpapers.map((wp) => {
+                      const isSelected = wallpaperUrl === wp.url;
+                      return (
+                        <div key={wp.id} style={{ position: 'relative' }}>
+                          <button
+                            onClick={() => handleWallpaperUrlChange(wp.url)}
+                            style={{
+                              position: 'relative',
+                              width: '100%',
+                              height: '52px',
+                              borderRadius: '10px',
+                              overflow: 'hidden',
+                              border: isSelected ? '2px solid var(--accent)' : '1px solid ' + (isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.15)'),
+                              padding: 0,
+                              cursor: 'pointer',
+                              transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                              boxShadow: isSelected ? '0 0 12px ' + (modes[currentMode]?.soft || 'rgba(0,180,255,0.4)') : 'none',
+                              display: 'block',
+                            }}
+                            title={wp.name}
+                          >
+                            {isVideoUrl(wp.url) ? (
+                              <video
+                                src={wp.url}
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                            ) : (
+                              <img
+                                src={wp.url}
+                                alt={wp.name}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                referrerPolicy="no-referrer"
+                              />
+                            )}
+                            {isVideoUrl(wp.url) && (
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  top: '3px',
+                                  left: '3px',
+                                  background: 'rgba(0,0,0,0.75)',
+                                  borderRadius: '4px',
+                                  padding: '1px 4px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '2px',
+                                  zIndex: 5,
+                                }}
+                                title="Video Wallpaper"
+                              >
+                                <svg viewBox="0 0 24 24" width="7" height="7" fill="#fff">
+                                  <polygon points="5,3 19,12 5,21" />
+                                </svg>
+                                <span style={{ fontSize: '6px', color: '#fff', fontWeight: 'bold', letterSpacing: '0.04em' }}>VID</span>
+                              </div>
+                            )}
+                            <div
+                              style={{
+                                position: 'absolute',
+                                inset: 0,
+                                background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 70%)',
+                                display: 'flex',
+                                alignItems: 'flex-end',
+                                justifyContent: 'center',
+                                padding: '2px 3px',
+                              }}
+                            >
+                              <span style={{ fontSize: '7.5px', fontWeight: '700', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+                                {wp.name}
+                              </span>
+                            </div>
+                          </button>
+
+                          {wp.isCustom && (
+                            <button
+                              onClick={(e) => handleDeleteCustomWallpaper(e, wp.url)}
+                              style={{
+                                position: 'absolute',
+                                top: '2px',
+                                right: '2px',
+                                width: '16px',
+                                height: '16px',
+                                borderRadius: '50%',
+                                background: 'rgba(235, 45, 45, 0.88)',
+                                color: '#fff',
+                                border: 'none',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                lineHeight: 1,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                zIndex: 10,
+                                boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
+                              }}
+                              title="Remove uploaded wallpaper"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+
+                {/* Custom Wallpaper Upload Button */}
                 <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
                   <button
-                    onClick={() => handleShowCountdownChange(true)}
+                    onClick={() => wallpaperFileInputRef.current?.click()}
                     style={{
                       flex: 1,
-                      padding: '7px 4px',
-                      borderRadius: '12px',
-                      background: showCountdown ? 'var(--accent)' : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)'),
-                      border: '1px solid ' + (showCountdown ? 'var(--accent)' : 'transparent'),
-                      color: showCountdown ? '#fff' : (isLight ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)'),
+                      padding: '7px 8px',
+                      borderRadius: '10px',
+                      background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
+                      border: '1px solid ' + (isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.12)'),
+                      color: isLight ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.9)',
                       fontWeight: '600',
-                      fontSize: '11px',
+                      fontSize: '10.5px',
                       cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '5px',
                       transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
                     }}
+                    title="Upload custom wallpaper image or video file (Max 3MB)"
                   >
-                    Shown
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <polyline points="21 15 16 10 5 21" />
+                    </svg>
+                    Upload Image/Video (≤3MB)
                   </button>
+                  <input
+                    ref={wallpaperFileInputRef}
+                    type="file"
+                    accept="image/*,video/*,.mp4,.webm,.ogg,.mov,.m4v,.mkv,.avi"
+                    style={{ display: 'none' }}
+                    onChange={handleCustomWallpaperUpload}
+                  />
+                </div>
+
+                {/* Wallpaper Opacity Slider */}
+                {wallpaperUrl && (
+                  <div
+                    className="no-drag wallpaper-opacity-slider"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px', background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.04)', padding: '8px 10px', borderRadius: '10px', border: '1px solid ' + (isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)') }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '10px', color: isLight ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)', fontWeight: '600' }}>
+                        Wallpaper Opacity
+                      </span>
+                      <span style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--accent)' }}>
+                        {wallpaperOpacity}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      className="no-drag"
+                      min="1"
+                      max="100"
+                      value={wallpaperOpacity}
+                      onChange={(e) => handleWallpaperOpacityChange(parseInt(e.target.value, 10))}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      style={{
+                        width: '100%',
+                        accentColor: 'var(--accent)',
+                        cursor: 'pointer',
+                        height: '4px',
+                        borderRadius: '2px',
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="setting-section" style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--divider)', paddingTop: '10px' }}>
+                <span className="setting-label" style={{ fontSize: '9.5px', color: isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 'bold', textAlign: 'left' }}>
+                  Checklist Data & Template
+                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
+                  <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
+                    <button
+                      onClick={handleExportChecklist}
+                      style={{
+                        flex: 1,
+                        padding: '6px 2px',
+                        borderRadius: '10px',
+                        background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
+                        border: '1px solid ' + (isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.12)'),
+                        color: isLight ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.9)',
+                        fontWeight: '600',
+                        fontSize: '10.5px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '5px',
+                        transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                      }}
+                      title="Export current checklist as .txt file"
+                    >
+                      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                      </svg>
+                      Export .TXT
+                    </button>
+
+                    <button
+                      onClick={generateChecklistTemplate}
+                      style={{
+                        flex: 1,
+                        padding: '6px 2px',
+                        borderRadius: '10px',
+                        background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
+                        border: '1px solid ' + (isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.12)'),
+                        color: isLight ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.9)',
+                        fontWeight: '600',
+                        fontSize: '10.5px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '5px',
+                        transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                      }}
+                      title="Download editable .txt template"
+                    >
+                      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="12" y1="18" x2="12" y2="12" />
+                        <polyline points="9 15 12 18 15 15" />
+                      </svg>
+                      Template .TXT
+                    </button>
+                  </div>
+
                   <button
-                    onClick={() => handleShowCountdownChange(false)}
+                    onClick={() => importFileInputRef.current?.click()}
                     style={{
-                      flex: 1,
-                      padding: '7px 4px',
-                      borderRadius: '12px',
-                      background: !showCountdown ? 'var(--accent)' : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)'),
-                      border: '1px solid ' + (!showCountdown ? 'var(--accent)' : 'transparent'),
-                      color: !showCountdown ? '#fff' : (isLight ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)'),
+                      width: '100%',
+                      padding: '7px 2px',
+                      borderRadius: '10px',
+                      background: 'var(--accent)',
+                      border: '1px solid var(--accent)',
+                      color: '#fff',
                       fontWeight: '600',
                       fontSize: '11px',
                       cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
                       transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
                     }}
+                    title="Upload and import checklist .txt file"
                   >
-                    Hidden
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    Import Checklist (.txt)
                   </button>
+                  <input
+                    ref={importFileInputRef}
+                    type="file"
+                    accept=".txt,.json,text/plain,application/json"
+                    style={{ display: 'none' }}
+                    onChange={handleImportChecklistFile}
+                  />
+
+                  {importStatus && (
+                    <div
+                      style={{
+                        fontSize: '9.5px',
+                        fontWeight: '600',
+                        textAlign: 'center',
+                        padding: '4px 6px',
+                        borderRadius: '6px',
+                        color: importStatus.type === 'success' ? '#00e676' : '#ff5252',
+                        background: importStatus.type === 'success' ? 'rgba(0, 230, 118, 0.12)' : 'rgba(255, 82, 82, 0.12)',
+                        border: '1px solid ' + (importStatus.type === 'success' ? 'rgba(0, 230, 118, 0.25)' : 'rgba(255, 82, 82, 0.25)'),
+                      }}
+                    >
+                      {importStatus.message}
+                    </div>
+                  )}
                 </div>
               </div>
 
-
-
+              {/* Reset App Section */}
               <div className="setting-section" style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--divider)', paddingTop: '10px' }}>
-                <span className="setting-label" style={{ fontSize: '10px', color: isLight ? 'rgba(0,0,0,0.45)' : 'rgba(255, 255, 255, 0.45)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 'bold' }}>Completion Alarm</span>
-                <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
-                  <button
-                    onClick={() => handleAlarmEnabledChange(true)}
-                    style={{
-                      flex: 1,
-                      padding: '7px 4px',
-                      borderRadius: '12px',
-                      background: alarmEnabled ? 'var(--accent)' : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)'),
-                      border: '1px solid ' + (alarmEnabled ? 'var(--accent)' : 'transparent'),
-                      color: alarmEnabled ? '#fff' : (isLight ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)'),
-                      fontWeight: '600',
-                      fontSize: '11px',
-                      cursor: 'pointer',
-                      transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
-                    }}
-                  >
-                    Alarm On
-                  </button>
-                  <button
-                    onClick={() => handleAlarmEnabledChange(false)}
-                    style={{
-                      flex: 1,
-                      padding: '7px 4px',
-                      borderRadius: '12px',
-                      background: !alarmEnabled ? 'var(--accent)' : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)'),
-                      border: '1px solid ' + (!alarmEnabled ? 'var(--accent)' : 'transparent'),
-                      color: !alarmEnabled ? '#fff' : (isLight ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)'),
-                      fontWeight: '600',
-                      fontSize: '11px',
-                      cursor: 'pointer',
-                      transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
-                    }}
-                  >
-                    Alarm Off
-                  </button>
-                </div>
-
-
+                <span className="setting-label" style={{ fontSize: '9.5px', color: isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 'bold', textAlign: 'left' }}>
+                  Reset App & Local Data
+                </span>
+                <button
+                  onClick={handleResetAppClick}
+                  onDoubleClick={handleResetAppDoubleClick}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '10px',
+                    background: resetConfirming ? 'rgba(255, 50, 50, 0.22)' : (isLight ? 'rgba(255, 50, 50, 0.08)' : 'rgba(255, 70, 70, 0.12)'),
+                    border: '1px solid ' + (resetConfirming ? 'rgba(255, 50, 50, 0.8)' : 'rgba(255, 70, 70, 0.3)'),
+                    color: resetConfirming ? '#ff3333' : '#ff5252',
+                    fontWeight: '700',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                  }}
+                  title="Double click to reset all app settings and data back to factory defaults"
+                >
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                    <path d="M3 3v5h5" />
+                  </svg>
+                  {resetConfirming ? '⚠️ Click again or Double-Click to Reset' : 'Double-Click to Reset App'}
+                </button>
               </div>
             </div>
           </div>
         )}
 
         {/* Text Header Mode Descriptions */}
-        {activeApp === 'checklist' && (
-          <div className="mode-row">
+        <div className="mode-row">
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <p className="mode-label" style={{ margin: 0 }}>Mode</p>
-            {/* Settings button placed beside the Mode text */}
             <button
-               className={`settings-toggle ${settingsOpen ? 'on' : ''}`}
-               id="settings-toggle"
-               onClick={() => {
-                 if (minimized) setMinimized(false);
-                 setSettingsOpen(!settingsOpen);
-                 setPickerOpen(false);
-                 setEditMode(false);
-               }}
+              className={`settings-toggle ${settingsOpen ? 'on' : ''}`}
+              id="settings-toggle"
+              onClick={() => {
+                if (minimized) setMinimized(false);
+                setSettingsOpen(!settingsOpen);
+                setPickerOpen(false);
+                setEditMode(false);
+              }}
+              title="Checklist Settings"
               style={{
-                background: settingsOpen 
-                  ? (isLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.22)')
-                  : (isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)'),
+                background: settingsOpen
+                  ? (isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.2)')
+                  : 'transparent',
                 border: 'none',
                 borderRadius: '50%',
-                width: '18px',
-                height: '18px',
-                display: 'flex',
+                width: '22px',
+                height: '22px',
+                padding: 0,
+                margin: 0,
+                display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                color: settingsOpen ? (isLight ? '#4f46e5' : '#818cf8') : (isLight ? '#64748b' : '#94a3b8'),
+                color: settingsOpen
+                  ? (isLight ? '#0284c7' : '#38bdf8')
+                  : (isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)'),
                 transition: 'all 0.15s ease-in-out',
-                padding: 0,
               }}
-              title="Global Settings"
               onMouseEnter={(e) => {
+                e.currentTarget.style.color = isLight ? '#0284c7' : '#38bdf8';
                 e.currentTarget.style.transform = 'scale(1.1)';
               }}
               onMouseLeave={(e) => {
+                e.currentTarget.style.color = settingsOpen
+                  ? (isLight ? '#0284c7' : '#38bdf8')
+                  : (isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)');
                 e.currentTarget.style.transform = 'scale(1)';
               }}
             >
-              <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="3" />
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
               </svg>
@@ -2118,7 +3629,7 @@ export default function App() {
                   background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
                   padding: '3px 8px',
                   borderRadius: '999px',
-                  border: '1px solid ' + (isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.15)'),
+                  border: 'none',
                   userSelect: 'none',
                 }}
                 onClick={(e) => e.stopPropagation()}
@@ -2272,7 +3783,7 @@ export default function App() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: 'var(--accent)',
+                      color: isLight ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.85)',
                       opacity: 0.9,
                       transition: 'opacity 0.15s',
                     }}
@@ -2319,11 +3830,11 @@ export default function App() {
                   gap: '8px',
                   fontSize: '11px',
                   fontWeight: '600',
-                  color: isTimerRunning ? 'var(--accent)' : 'var(--text-dim)',
-                  background: isTimerRunning ? 'var(--accent-soft)' : (isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.04)'),
+                  color: isLight ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.85)',
+                  background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
                   padding: '3px 8px',
                   borderRadius: '999px',
-                  border: '1px solid ' + (isTimerRunning ? 'var(--accent)' : 'transparent'),
+                  border: 'none',
                   userSelect: 'none',
                   transition: 'all 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
                   cursor: 'pointer',
@@ -2433,163 +3944,300 @@ export default function App() {
             )
           )}
         </div>
-        )}
-        {/* Toggle displays to keep FxCalendar always mounted for background alarm alerts */}
-        <div style={{ display: activeApp === 'checklist' ? 'contents' : 'none' }}>
-          <div className="title-wrap">
-            {editingTitle ? (
-              <input
-                ref={titleInputRef}
-                className="title-input"
-                style={{ display: 'block' }}
-                type="text"
-                value={titleInputValue}
-                onChange={(e) => setTitleInputValue(e.target.value)}
-                onBlur={commitTitleEditing}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitTitleEditing();
-                }}
-              />
-            ) : (
-              <div className={`title-container-editable ${editMode ? 'can-edit' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h1
-                  className={`title ${editMode ? 'editable' : ''}`}
-                  id="mode-title"
-                  onClick={startEditingTitle}
-                  onMouseDown={(e) => {
-                    if (editMode) {
-                      e.stopPropagation();
-                      startEditingTitle();
-                    }
-                  }}
-                >
-                  {modes[currentMode]?.title || 'Precision'}
-                </h1>
-                {editMode && (
-                  <button
-                    className="edit-title-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      startEditingTitle();
-                    }}
+        <div className="title-wrap">
+          {editingTitle ? (
+            <input
+              ref={titleInputRef}
+              className="title-input"
+              style={{
+                display: 'block',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                fontSize: titleInputValue.length > 22 ? '18px' : titleInputValue.length > 15 ? '21px' : '25px',
+                width: '100%',
+                flex: 1,
+                minWidth: 0,
+                boxSizing: 'border-box',
+              }}
+              type="text"
+              value={titleInputValue}
+              onChange={(e) => setTitleInputValue(e.target.value)}
+              onBlur={commitTitleEditing}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitTitleEditing();
+              }}
+            />
+          ) : (
+            <div className={`title-container-editable ${editMode ? 'can-edit' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, overflow: 'hidden' }}>
+              {(() => {
+                const titleStr = modes[currentMode]?.title || 'Precision';
+                const dynamicFontSize = titleStr.length > 22 ? '18px' : titleStr.length > 15 ? '21px' : '25px';
+                return (
+                  <h1
+                    className={`title ${editMode ? 'editable' : ''}`}
+                    id="mode-title"
+                    onClick={startEditingTitle}
                     onMouseDown={(e) => {
-                      e.stopPropagation();
-                      startEditingTitle();
+                      if (editMode) {
+                        e.stopPropagation();
+                        startEditingTitle();
+                      }
                     }}
-                    title="Rename Mode"
                     style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: '4px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      opacity: 0.6,
-                      color: 'var(--text)',
-                      transition: 'opacity 0.2s',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      maxWidth: '100%',
+                      lineHeight: '1.2',
+                      paddingBottom: '2px',
+                      display: 'block',
+                      fontSize: dynamicFontSize,
+                      flex: 1,
+                      minWidth: 0,
                     }}
                   >
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                      <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-            )}
-            <span className="mode-counter" id="mode-counter">
-              {totalModeChecked}/{totalModeOptions}
-            </span>
-          </div>
-
-          <div className="divider"></div>
-
-          {/* Dynamic Items list area */}
-          <div className="card-body">
-            <div className="scroll-area">
-              <ul className="options" id="options-list">
-                {modes[currentMode]?.options.map((itemText, optionIdx) => {
-                  const isItemChecked = (selections[currentMode] || []).includes(optionIdx);
-                  const isEditingItem = editingItemIdx === optionIdx;
-
-                  return (
-                    <li className={`option ${isItemChecked ? 'selected' : ''}`} key={optionIdx} onClick={() => handleOptionToggle(optionIdx)}>
-                      {/* Tick box checkbox circle */}
-                      <span className="check-box">
-                        <svg viewBox="0 0 16 16">
-                          <polyline points="2,8 6,12 14,4" />
-                        </svg>
-                      </span>
-
-                      {isEditingItem ? (
-                        <input
-                          ref={listInputRef}
-                          className="opt-input"
-                          style={{ display: 'block' }}
-                          type="text"
-                          value={editingItemValue}
-                          onChange={(e) => setEditingItemValue(e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          onBlur={() => commitItemEditing(optionIdx)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') commitItemEditing(optionIdx);
-                          }}
-                        />
-                      ) : (
-                        <span className="opt-text">{itemText}</span>
-                      )}
-
-                      {/* Action delete toggle */}
-                      {editMode && (
-                        <button className="del-btn animate-fade-in" style={{ display: 'flex' }} onClick={(e) => deleteItemOption(e, optionIdx)}>
-                          ×
-                        </button>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-
+                    {titleStr}
+                  </h1>
+                );
+              })()}
               {editMode && (
-                <button className="add-btn" style={{ display: 'flex' }} onClick={addNewItemOption}>
-                  <svg viewBox="0 0 24 24">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
+                <button
+                  className="edit-title-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    startEditingTitle();
+                  }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    startEditingTitle();
+                  }}
+                  title="Rename Mode"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '4px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: 0.6,
+                    color: 'var(--text)',
+                    transition: 'opacity 0.2s',
+                  }}
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                   </svg>
-                  Add option
                 </button>
               )}
             </div>
-
-            {/* Reset tab-checkboxes trigger */}
-            <div className="reset-wrap font-sans" onClick={triggerResetChecklist} style={{ userSelect: 'none' }}>
-              <button className="reset-btn" tabIndex={-1}>
-                <svg viewBox="0 0 24 24">
-                  <polyline points="1 4 1 10 7 10" />
-                  <path d="M3.51 15a9 9 0 1 0 .49-4.5" />
-                </svg>
-                <span id="reset-label">{editMode ? 'Reset all columns' : 'Reset active column'}</span>
-              </button>
-            </div>
-          </div>
+          )}
+          <span className="mode-counter" id="mode-counter">
+            {totalModeChecked}/{totalModeOptions}
+          </span>
         </div>
 
-        <div style={{ display: activeApp === 'calendar' ? 'contents' : 'none' }}>
-          <FxCalendar 
-            isLight={isLight} 
-            scale={scale} 
-            onBackToChecklist={() => setActiveApp('checklist')} 
-            settingsPanelOpen={calendarSettingsOpen}
-            setSettingsPanelOpen={setCalendarSettingsOpen}
-            minimized={minimized}
-            setMinimized={setMinimized}
-          />
+        <div className="divider"></div>
+
+        {/* Dynamic Items list area */}
+        <div className="card-body">
+          <div className={`scroll-area ${isChecklistScrolling ? 'is-scrolling' : ''}`} onScroll={handleChecklistScroll}>
+            <ul className="options" id="options-list">
+              {modes[currentMode]?.options.map((itemText, optionIdx) => {
+                const isItemChecked = (selections[currentMode] || []).includes(optionIdx);
+                const isEditingItem = editingItemIdx === optionIdx;
+                const totalOptionsCount = modes[currentMode]?.options.length || 0;
+
+                return (
+                  <li
+                    className={`option ${isItemChecked ? 'selected' : ''} ${draggedOptionIdx === optionIdx ? 'dragging-option' : ''}`}
+                    key={optionIdx}
+                    onClick={() => handleOptionToggle(optionIdx)}
+                    draggable={editMode}
+                    onDragStart={(e) => {
+                      if (!editMode) return;
+                      setDraggedOptionIdx(optionIdx);
+                      e.dataTransfer.setData('text/plain', String(optionIdx));
+                      e.dataTransfer.effectAllowed = 'move';
+                    }}
+                    onDragOver={(e) => {
+                      if (!editMode) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                    }}
+                    onDrop={(e) => {
+                      if (!editMode) return;
+                      e.preventDefault();
+                      const fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                      if (!isNaN(fromIdx) && fromIdx !== optionIdx) {
+                        moveOption(fromIdx, optionIdx);
+                      }
+                      setDraggedOptionIdx(null);
+                    }}
+                    onDragEnd={() => setDraggedOptionIdx(null)}
+                    style={{ cursor: editMode ? 'grab' : 'pointer' }}
+                  >
+                    {/* Drag handle icon in edit mode */}
+                    {editMode && (
+                      <span
+                        className="drag-handle-icon"
+                        title="Drag or use arrows to reorder item"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          color: isLight ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.35)',
+                          cursor: 'grab',
+                          marginRight: '2px',
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+                          <circle cx="9" cy="6" r="1.5" />
+                          <circle cx="15" cy="6" r="1.5" />
+                          <circle cx="9" cy="12" r="1.5" />
+                          <circle cx="15" cy="12" r="1.5" />
+                          <circle cx="9" cy="18" r="1.5" />
+                          <circle cx="15" cy="18" r="1.5" />
+                        </svg>
+                      </span>
+                    )}
+
+                    {/* Tick box checkbox circle */}
+                    <span className="check-box">
+                      <svg viewBox="0 0 16 16">
+                        <polyline points="2,8 6,12 14,4" />
+                      </svg>
+                    </span>
+
+                    {isEditingItem ? (
+                      <input
+                        ref={listInputRef}
+                        className="opt-input"
+                        style={{ display: 'block' }}
+                        type="text"
+                        value={editingItemValue}
+                        onChange={(e) => setEditingItemValue(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onBlur={() => commitItemEditing(optionIdx)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitItemEditing(optionIdx);
+                        }}
+                      />
+                    ) : (
+                      <span className="opt-text">{itemText}</span>
+                    )}
+
+                    {/* Action reorder & delete buttons in edit mode */}
+                    {editMode && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          marginLeft: 'auto',
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          className="reorder-item-btn"
+                          disabled={optionIdx === 0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            moveOption(optionIdx, optionIdx - 1);
+                          }}
+                          style={{
+                            background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
+                            border: '1px solid ' + (isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.15)'),
+                            color: isLight ? '#0f172a' : '#ffffff',
+                            opacity: optionIdx === 0 ? 0.25 : 0.85,
+                            cursor: optionIdx === 0 ? 'default' : 'pointer',
+                            padding: '2px 5px',
+                            borderRadius: '5px',
+                            fontSize: '9px',
+                            lineHeight: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                          title="Move item up"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          className="reorder-item-btn"
+                          disabled={optionIdx === totalOptionsCount - 1}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            moveOption(optionIdx, optionIdx + 1);
+                          }}
+                          style={{
+                            background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
+                            border: '1px solid ' + (isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.15)'),
+                            color: isLight ? '#0f172a' : '#ffffff',
+                            opacity: optionIdx === totalOptionsCount - 1 ? 0.25 : 0.85,
+                            cursor: optionIdx === totalOptionsCount - 1 ? 'default' : 'pointer',
+                            padding: '2px 5px',
+                            borderRadius: '5px',
+                            fontSize: '9px',
+                            lineHeight: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                          title="Move item down"
+                        >
+                          ▼
+                        </button>
+                        <button className="del-btn animate-fade-in" style={{ display: 'flex' }} onClick={(e) => deleteItemOption(e, optionIdx)} title="Delete option">
+                          ×
+                        </button>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+
+            {editMode && (
+              <button className="add-btn" style={{ display: 'flex' }} onClick={addNewItemOption}>
+                <svg viewBox="0 0 24 24">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Add option
+              </button>
+            )}
+          </div>
+
+          {/* Reset tab-checkboxes trigger */}
+          <div className="reset-wrap font-sans" onClick={triggerResetChecklist} style={{ userSelect: 'none' }}>
+            <button className="reset-btn" tabIndex={-1}>
+              <svg viewBox="0 0 24 24">
+                <polyline points="1 4 1 10 7 10" />
+                <path d="M3.51 15a9 9 0 1 0 .49-4.5" />
+              </svg>
+              <span id="reset-label">{editMode ? 'Reset all columns' : 'Reset active column'}</span>
+            </button>
+          </div>
         </div>
           </>
         )}
         </div>
-      </BorderGlow>
+
+        <div style={{ display: activeApp === 'calendar' ? 'contents' : 'none' }}>
+          <FxCalendar
+            isLight={isLight}
+            minimized={minimized}
+            onBackToChecklist={() => setActiveApp('checklist')}
+            settingsPanelOpen={calendarSettingsOpen}
+            setSettingsPanelOpen={setCalendarSettingsOpen}
+          />
+        </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

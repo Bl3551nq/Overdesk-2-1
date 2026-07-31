@@ -254,7 +254,7 @@ const playFallbackSynth = (profile: string) => {
 
 interface FxCalendarProps {
   isLight: boolean;
-  scale: number;
+  scale?: number;
   onBackToChecklist?: () => void;
   settingsPanelOpen?: boolean;
   setSettingsPanelOpen?: (open: boolean) => void;
@@ -1368,21 +1368,15 @@ export default function FxCalendar({
     <div className="fx-container font-sans" style={{
       display: 'flex',
       flexDirection: 'column',
-      height: '338px',
+      height: '340px',
       boxSizing: 'border-box',
       overflow: 'hidden',
       position: 'relative',
-      background: isLight 
-        ? 'linear-gradient(135deg, rgba(242, 248, 255, 0.6) 0%, rgba(228, 240, 255, 0.4) 100%)' 
-        : 'radial-gradient(circle at 50% 20%, #121030 0%, #070617 100%)',
-      backdropFilter: isLight ? 'blur(16px)' : undefined,
-      WebkitBackdropFilter: isLight ? 'blur(16px)' : undefined,
-      borderRadius: '24px',
-      padding: '14px 10px 10px 10px',
-      border: isLight ? '1px solid rgba(255, 255, 255, 0.6)' : '1px solid rgba(255, 255, 255, 0.05)',
-      boxShadow: isLight 
-        ? 'inset 0 1px 1.5px rgba(255, 255, 255, 0.65), 0 8px 32px 0 rgba(31, 38, 135, 0.06)' 
-        : 'inset 0 1px 1px rgba(255,255,255,0.03), 0 10px 40px rgba(0,0,0,0.35)',
+      background: 'transparent',
+      padding: '0 2px',
+      border: 'none',
+      boxShadow: 'none',
+      borderRadius: '0',
     }}>
       
       {/* SideRays lighting effect for app 2 in dark mode */}
@@ -2155,7 +2149,16 @@ export default function FxCalendar({
           left: 0,
           right: 0,
           bottom: 0,
-          background: isLight ? '#f4f6fc' : '#0b0a1a',
+          background: isLight 
+            ? 'radial-gradient(circle at 10% 10%, rgba(255, 255, 255, 0.75) 0%, transparent 50%), linear-gradient(145deg, rgba(244, 246, 252, 0.55) 0%, rgba(228, 235, 250, 0.65) 100%)' 
+            : 'radial-gradient(circle at 10% 10%, rgba(255, 255, 255, 0.08) 0%, transparent 50%), linear-gradient(145deg, rgba(11, 10, 26, 0.55) 0%, rgba(5, 4, 15, 0.65) 100%)',
+          backdropFilter: 'blur(30px) saturate(210%)',
+          WebkitBackdropFilter: 'blur(30px) saturate(210%)',
+          border: isLight ? '1px solid rgba(255, 255, 255, 0.8)' : '1px solid rgba(255, 255, 255, 0.12)',
+          boxShadow: isLight 
+            ? '0 8px 32px rgba(31, 38, 135, 0.12), inset 0 1px 2px rgba(255,255,255,0.8)' 
+            : '0 10px 40px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255,255,255,0.08)',
+          borderRadius: '24px',
           color: isLight ? '#1e293b' : '#f8fafc',
           display: 'flex',
           flexDirection: 'column',
