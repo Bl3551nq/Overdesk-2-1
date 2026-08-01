@@ -59,8 +59,8 @@ body.electron .theme-switch, body.electron .minimize-pill, body.electron .minimi
 body.electron .resize-handle, body.electron .reset-wrap, body.electron .color-swatch, 
 body.electron .color-custom-wrap, body.electron .title-wrap, body.electron .title, 
 body.electron .title-container-editable, body.electron .edit-title-btn,
-body.electron .title-input, body.electron .mode-label, body.electron a, body.electron select, body.electron .picker-grid,
-body.electron .icon-picker, body.electron #settings-panel, body.electron .settings-body, body.electron .setting-section,
+body.electron .title-input, body.electron .mode-label, body.electron a, body.electron select, body.electron .settings-body, body.electron .setting-section,
+body.electron .picker-grid,
 body.electron .no-drag,
 body.electron input[type="range"],
 body.electron input[type="range"]::-webkit-slider-thumb,
@@ -1111,11 +1111,11 @@ body.editing .option { cursor: default; }
   background: 
     radial-gradient(circle at 10% 10%, rgba(255, 255, 255, 0.08) 0%, transparent 50%),
     radial-gradient(circle at 90% 85%, var(--accent-soft) 0%, transparent 60%),
-    linear-gradient(145deg, rgba(12, 15, 28, 0.48) 0%, rgba(5, 7, 16, 0.58) 100%);
-  backdrop-filter: blur(35px) saturate(220%);
-  -webkit-backdrop-filter: blur(35px) saturate(220%);
+    linear-gradient(145deg, rgba(12, 15, 28, 0.96) 0%, rgba(5, 7, 16, 0.98) 100%);
+  backdrop-filter: blur(40px) saturate(220%);
+  -webkit-backdrop-filter: blur(40px) saturate(220%);
   border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 0 1px 1px rgba(255, 255, 255, 0.18) inset, 0 10px 40px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 1px 1px rgba(255, 255, 255, 0.18) inset, 0 10px 40px rgba(0, 0, 0, 0.5);
   display: none;
   flex-direction: column;
   padding: 13px 14px 12px;
@@ -1346,13 +1346,13 @@ body.editing .option { cursor: default; }
 
 .card.light .icon-picker {
   background: 
-    radial-gradient(circle at 10% 10%, rgba(255, 255, 255, 0.8) 0%, transparent 50%),
+    radial-gradient(circle at 10% 10%, rgba(255, 255, 255, 0.95) 0%, transparent 50%),
     radial-gradient(circle at 90% 85%, var(--accent-soft) 0%, transparent 60%),
-    linear-gradient(145deg, rgba(255, 255, 255, 0.55) 0%, rgba(238, 241, 252, 0.65) 100%);
-  backdrop-filter: blur(35px) saturate(210%);
-  -webkit-backdrop-filter: blur(35px) saturate(210%);
+    linear-gradient(145deg, rgba(255, 255, 255, 0.96) 0%, rgba(238, 241, 252, 0.98) 100%);
+  backdrop-filter: blur(40px) saturate(210%);
+  -webkit-backdrop-filter: blur(40px) saturate(210%);
   border: 1px solid rgba(255, 255, 255, 0.7);
-  box-shadow: 0 0 1px 1px rgba(255, 255, 255, 0.9) inset, 0 8px 32px rgba(31, 38, 135, 0.1);
+  box-shadow: 0 0 1px 1px rgba(255, 255, 255, 0.9) inset, 0 8px 32px rgba(31, 38, 135, 0.15);
 }
 .card.light .picker-title {
   color: rgba(0, 0, 0, 0.35);

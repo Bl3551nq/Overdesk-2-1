@@ -94,6 +94,25 @@ export const getLocalEventDayString = (isoString: string): string => {
   }
 };
 
+// Safely parses event date and time into local wall-clock Date object without timezone offset distortion
+export const getEventLocalDateTime = (isoString: string): Date => {
+  try {
+    const str = String(isoString || '').trim();
+    const match = str.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    if (match) {
+      const year = parseInt(match[1], 10);
+      const month = parseInt(match[2], 10) - 1; // 0-indexed month
+      const day = parseInt(match[3], 10);
+      const hours = parseInt(match[4], 10);
+      const minutes = parseInt(match[5], 10);
+      return new Date(year, month, day, hours, minutes, 0, 0);
+    }
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) return d;
+  } catch (_) {}
+  return new Date();
+};
+
 // Define remote custom high-fidelity MP3 chimes hosted on GitHub raw CDN
 const REMOTE_AUDIO_URLS: Record<string, string> = {
   school: "https://raw.githubusercontent.com/Bl3551nq/bell-sound/main/school_bell.mp3",
@@ -906,7 +925,7 @@ export default function FxCalendar({
       }
       triggerAlarmSound(profile);
       strike++;
-      setTimeout(nextStrike, 1100);
+      setTimeout(nextStrike, 3000); // 3 seconds apart for clean spacing
     };
     nextStrike();
 
@@ -950,13 +969,25 @@ export default function FxCalendar({
       const nowMs = simDateRef.current.getTime();
 
       const shouldAlert = (e: FxEvent): boolean => {
+        // Safe currency filter
         const eventCountry = String(e.country || '').trim().toUpperCase();
         const currenciesUpper = activeCurrencies.map(c => String(c).trim().toUpperCase());
         if (!currenciesUpper.includes(eventCountry)) return false;
 
+        // Safe impact filter (map Holiday to Non-Econ)
+        let mappedImpact = String(e.impact || '').trim();
+        if (mappedImpact === 'Holiday') mappedImpact = 'Non-Econ';
+        const impactsLower = activeImpacts.map(i => String(i).trim().toLowerCase());
+        if (!impactsLower.includes(mappedImpact.toLowerCase())) return false;
+
+        // Dismissed / Observed events check
         const eventId = `${e.country}-${e.date}-${e.title}`;
+        if (observedEvents.includes(eventId)) return false;
+
+        // Custom muted events check
         if (customMutedEvents.includes(eventId)) return false;
 
+        // Muted keywords check
         const isExplicitlyUnmuted = customUnmutedEvents.includes(eventId);
         const isMuted = mutedKeywords.some(key =>
           e.title.toLowerCase().includes(key.toLowerCase())
@@ -972,8 +1003,8 @@ export default function FxCalendar({
       currentDynamicEvents.forEach(e => {
         if (!shouldAlert(e)) return;
 
-        // Parse event time directly from the ISO string to avoid timezone issues
-        const eventMs = new Date(e.date).getTime();
+        // Parse event time directly as local wall-clock Date to match screen display
+        const eventMs = getEventLocalDateTime(e.date).getTime();
         const diffSeconds = (eventMs - nowMs) / 1000;
         const eventStamp = `${e.country}-${e.date}-${e.title}`;
 
@@ -1134,8 +1165,6 @@ export default function FxCalendar({
     if (currentIdx > 0) {
       const prevDay = dayList[currentIdx - 1];
       setSelectedDayString(prevDay);
-      // Synchronize simulator to the morning of the newly selected day:
-      setSimDate(new Date(`${prevDay}T08:00:00+01:00`));
     }
   };
 
@@ -1144,8 +1173,6 @@ export default function FxCalendar({
     if (currentIdx < dayList.length - 1) {
       const nextDay = dayList[currentIdx + 1];
       setSelectedDayString(nextDay);
-      // Synchronize simulator to the morning of the newly selected day:
-      setSimDate(new Date(`${nextDay}T08:00:00+01:00`));
     }
   };
 
@@ -1403,24 +1430,50 @@ export default function FxCalendar({
       )}
 
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%', flex: 1, overflow: 'hidden' }}>
-        {/* Dynamic Alert Overlay Banner when alarm triggers */}
+        {/* Dynamic Glassy Alert Overlay Banner when alarm triggers */}
         {activeAlertText && (
-        <div style={{
-          background: 'rgba(239, 68, 68, 0.95)',
-          color: '#ffffff',
-          fontSize: '11px',
-          fontWeight: '700',
-          padding: '8px 12px',
-          borderRadius: '10px',
-          textAlign: 'center',
-          marginBottom: '10px',
-          boxShadow: '0 8px 20px rgba(239, 68, 68, 0.3)',
-          animation: 'pulse 1s infinite alternate',
-          fontFamily: 'var(--font-sans)',
-        }}>
-          🚨 {activeAlertText}
-        </div>
-      )}
+          <div style={{
+            background: isLight 
+              ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.18) 0%, rgba(244, 114, 182, 0.14) 100%), rgba(255, 255, 255, 0.85)' 
+              : 'linear-gradient(135deg, rgba(239, 68, 68, 0.28) 0%, rgba(168, 85, 247, 0.22) 100%), rgba(18, 14, 36, 0.78)',
+            backdropFilter: 'blur(20px) saturate(200%)',
+            WebkitBackdropFilter: 'blur(20px) saturate(200%)',
+            border: isLight ? '1px solid rgba(239, 68, 68, 0.35)' : '1px solid rgba(255, 255, 255, 0.25)',
+            boxShadow: isLight 
+              ? '0 8px 24px rgba(239, 68, 68, 0.18), inset 0 0 12px rgba(255, 255, 255, 0.6)' 
+              : '0 8px 32px rgba(0, 0, 0, 0.45), inset 0 0 12px rgba(255, 255, 255, 0.15)',
+            color: isLight ? '#b91c1c' : '#ffffff',
+            fontSize: '11px',
+            fontWeight: '700',
+            padding: '9px 14px',
+            borderRadius: '12px',
+            textAlign: 'center',
+            marginBottom: '10px',
+            letterSpacing: '0.02em',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            animation: 'pulse 1.8s infinite ease-in-out',
+            fontFamily: 'var(--font-sans)',
+            zIndex: 99,
+          }}>
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '18px',
+              height: '18px',
+              borderRadius: '50%',
+              background: 'rgba(239, 68, 68, 0.2)',
+              fontSize: '11px',
+              flexShrink: 0
+            }}>🔔</span>
+            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {activeAlertText}
+            </span>
+          </div>
+        )}
 
       {/* Header section with clickable Date Picker trigger */}
       <div style={{
@@ -1663,7 +1716,6 @@ export default function FxCalendar({
                   onClick={() => {
                     if (isWithinBounds) {
                       setSelectedDayString(dayStr);
-                      setSimDate(new Date(`${dayStr}T08:00:00+01:00`));
                       setIsDatePickerOpen(false);
                     }
                   }}
@@ -1816,10 +1868,11 @@ export default function FxCalendar({
                     >
                       {/* Left Column: Time & PM/AM */}
                       {(() => {
-                        const eDate = new Date(e.date);
+                        const eDate = getEventLocalDateTime(e.date);
                         const isEventActiveHour = eDate.getHours() === simDate.getHours() &&
                                                  eDate.getDate() === simDate.getDate() &&
-                                                 eDate.getMonth() === simDate.getMonth();
+                                                 eDate.getMonth() === simDate.getMonth() &&
+                                                 eDate.getFullYear() === simDate.getFullYear();
                         return (
                           <div style={{
                             width: '38px',
@@ -2150,8 +2203,8 @@ export default function FxCalendar({
           right: 0,
           bottom: 0,
           background: isLight 
-            ? 'radial-gradient(circle at 10% 10%, rgba(255, 255, 255, 0.75) 0%, transparent 50%), linear-gradient(145deg, rgba(244, 246, 252, 0.55) 0%, rgba(228, 235, 250, 0.65) 100%)' 
-            : 'radial-gradient(circle at 10% 10%, rgba(255, 255, 255, 0.08) 0%, transparent 50%), linear-gradient(145deg, rgba(11, 10, 26, 0.55) 0%, rgba(5, 4, 15, 0.65) 100%)',
+            ? 'radial-gradient(circle at 10% 10%, rgba(255, 255, 255, 0.95) 0%, transparent 50%), linear-gradient(145deg, rgba(244, 246, 252, 0.96) 0%, rgba(228, 235, 250, 0.98) 100%)' 
+            : 'radial-gradient(circle at 10% 10%, rgba(255, 255, 255, 0.08) 0%, transparent 50%), linear-gradient(145deg, rgba(11, 10, 26, 0.96) 0%, rgba(5, 4, 15, 0.98) 100%)',
           backdropFilter: 'blur(30px) saturate(210%)',
           WebkitBackdropFilter: 'blur(30px) saturate(210%)',
           border: isLight ? '1px solid rgba(255, 255, 255, 0.8)' : '1px solid rgba(255, 255, 255, 0.12)',

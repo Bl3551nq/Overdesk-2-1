@@ -1364,8 +1364,6 @@ export default function App() {
         curr.closest('.mode-drag-handle') ||
         curr.closest('.edit-toggle') ||
         curr.closest('.settings-toggle') ||
-        curr.closest('#settings-panel') ||
-        curr.closest('.icon-picker') ||
         curr.closest('.settings-body') ||
         curr.closest('.setting-section') ||
         curr.closest('.wallpaper-opacity-slider') ||
@@ -1692,7 +1690,17 @@ export default function App() {
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.clearRect(0, 0, 256, 256);
-            ctx.drawImage(img, 0, 0, 256, 256);
+
+            // Fit image proportionally inside 256x256 canvas to prevent oval distortion
+            const imgW = img.naturalWidth || img.width || 256;
+            const imgH = img.naturalHeight || img.height || 256;
+            const scale = Math.min(256 / imgW, 256 / imgH);
+            const drawW = imgW * scale;
+            const drawH = imgH * scale;
+            const offsetX = (256 - drawW) / 2;
+            const offsetY = (256 - drawH) / 2;
+
+            ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
             const dataUrl = canvas.toDataURL('image/png');
             (window as any).electronAPI.saveIcon(dataUrl);
           }
@@ -1704,6 +1712,21 @@ export default function App() {
         console.error('Error auto-generating and saving dynamic logo:', err);
       }
     }
+  }, []);
+
+  // Global Keyboard Shortcut: Ctrl + N (or Cmd + N) to switch to next app / toggle back and forth
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault();
+        setActiveApp((prev) => (prev === 'checklist' ? 'calendar' : 'checklist'));
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+    };
   }, []);
 
   // Handle reporting dynamic visual bounding box to Electron to prevent clipping with ResizeObserver
@@ -3070,18 +3093,18 @@ export default function App() {
         {/* Global Settings Panel overlay */}
         {settingsOpen && (
           <div
-            className="icon-picker open no-drag"
+            className="icon-picker open"
             id="settings-panel"
-            onPointerDown={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
           >
-            <div className="picker-header" style={{ flexDirection: 'column', alignItems: 'center', marginBottom: '4px', gap: '4px' }}>
+            <div className="picker-header" style={{ flexDirection: 'column', alignItems: 'center', marginBottom: '4px', gap: '4px', cursor: 'grab' }}>
               <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
                 <button
                   className="picker-done"
                   onClick={() => setSettingsOpen(false)}
                   title="Done"
                   style={{ display: 'flex', alignItems: 'center' }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
                 >
                   <svg viewBox="0 0 24 24" style={{ width: '13px', height: '13px', marginRight: '4px' }}>
                     <polyline points="20 6 9 17 4 12" />
@@ -3092,7 +3115,12 @@ export default function App() {
               <span className="picker-title" style={{ textAlign: 'center', fontSize: '11px', letterSpacing: '0.14em', fontWeight: 700 }}>Settings</span>
             </div>
 
-            <div className="settings-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '6px 4px 16px', flex: 1, minHeight: 0 }}>
+            <div
+              className="settings-body"
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '6px 4px 16px', flex: 1, minHeight: 0 }}
+            >
               <div className="setting-section" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <span className="setting-label" style={{ fontSize: '9.5px', color: isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 'bold', textAlign: 'left' }}>Window Scale</span>
                 <GooeyNav
