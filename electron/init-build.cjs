@@ -12,8 +12,9 @@ async function buildIcon() {
       throw new Error(`SVG file not found at ${svgPath}`);
     }
 
-    // Render SVG into 256x256 square preserving exact natural proportions
+    // Trim transparent margins around artwork then scale proportionally to fill 256x256 icon frame
     await sharp(svgPath)
+      .trim()
       .resize(256, 256, {
         fit: 'contain',
         background: { r: 0, g: 0, b: 0, alpha: 0 }

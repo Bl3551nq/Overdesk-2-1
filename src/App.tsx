@@ -1684,6 +1684,41 @@ export default function App() {
         img.crossOrigin = 'anonymous';
         img.src = overdeskLogo;
         img.onload = () => {
+          const imgW = img.naturalWidth || img.width || 256;
+          const imgH = img.naturalHeight || img.height || 256;
+
+          // Render raw image to temporary canvas to inspect alpha pixels & trim empty padding
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = imgW;
+          tempCanvas.height = imgH;
+          const tempCtx = tempCanvas.getContext('2d');
+          if (!tempCtx) return;
+
+          tempCtx.drawImage(img, 0, 0);
+          const imgData = tempCtx.getImageData(0, 0, imgW, imgH);
+          const data = imgData.data;
+
+          let minX = imgW, minY = imgH, maxX = 0, maxY = 0;
+          let found = false;
+
+          for (let y = 0; y < imgH; y += 2) {
+            for (let x = 0; x < imgW; x += 2) {
+              const alpha = data[(y * imgW + x) * 4 + 3];
+              if (alpha > 10) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+                found = true;
+              }
+            }
+          }
+
+          const cropX = found ? minX : 0;
+          const cropY = found ? minY : 0;
+          const cropW = found ? Math.max(1, maxX - minX + 1) : imgW;
+          const cropH = found ? Math.max(1, maxY - minY + 1) : imgH;
+
           const canvas = document.createElement('canvas');
           canvas.width = 256;
           canvas.height = 256;
@@ -1691,16 +1726,14 @@ export default function App() {
           if (ctx) {
             ctx.clearRect(0, 0, 256, 256);
 
-            // Fit image proportionally inside 256x256 canvas to prevent oval distortion
-            const imgW = img.naturalWidth || img.width || 256;
-            const imgH = img.naturalHeight || img.height || 256;
-            const scale = Math.min(256 / imgW, 256 / imgH);
-            const drawW = imgW * scale;
-            const drawH = imgH * scale;
+            // Scale trimmed artwork proportionally so it fills the 256x256 icon canvas at max size
+            const scale = Math.min(256 / cropW, 256 / cropH);
+            const drawW = cropW * scale;
+            const drawH = cropH * scale;
             const offsetX = (256 - drawW) / 2;
             const offsetY = (256 - drawH) / 2;
 
-            ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+            ctx.drawImage(tempCanvas, cropX, cropY, cropW, cropH, offsetX, offsetY, drawW, drawH);
             const dataUrl = canvas.toDataURL('image/png');
             (window as any).electronAPI.saveIcon(dataUrl);
           }
