@@ -402,6 +402,7 @@ interface ModeDetail {
   defaultAccent: string;
   defaultSoft: string;
   options: string[];
+  baseOptions?: string[];
 }
 
 const isVideoUrl = (url: string): boolean => {
@@ -432,6 +433,12 @@ const DEFAULT_MODES: Record<string, ModeDetail> = {
       'Check Economic Calendar for high-impact news',
       'Identify market structure (BOS / CHoCH)',
     ],
+    baseOptions: [
+      'Analyze higher timeframe (D1/H4) trend',
+      'Mark key Support & Resistance / Liquidity zones',
+      'Check Economic Calendar for high-impact news',
+      'Identify market structure (BOS / CHoCH)',
+    ],
   },
   life: {
     title: 'Risk Management',
@@ -440,6 +447,12 @@ const DEFAULT_MODES: Record<string, ModeDetail> = {
     defaultAccent: 'rgba(0, 190, 80, 0.9)',
     defaultSoft: 'rgba(0, 230, 100, 0.16)',
     options: [
+      'Calculate max risk per trade (1% - 2%)',
+      'Set precise Stop Loss price before entry',
+      'Verify Risk-to-Reward ratio (min 1:2)',
+      'Confirm total account margin & lot size',
+    ],
+    baseOptions: [
       'Calculate max risk per trade (1% - 2%)',
       'Set precise Stop Loss price before entry',
       'Verify Risk-to-Reward ratio (min 1:2)',
@@ -458,6 +471,12 @@ const DEFAULT_MODES: Record<string, ModeDetail> = {
       'Check confluence indicators (RSI, MA, Volume)',
       'Avoid trading inside low-liquidity chop',
     ],
+    baseOptions: [
+      'Wait for clear setup at Key Zone / Order Block',
+      'Confirm lower timeframe entry trigger (M15/M5)',
+      'Check confluence indicators (RSI, MA, Volume)',
+      'Avoid trading inside low-liquidity chop',
+    ],
   },
   sync: {
     title: 'Trade Execution',
@@ -471,6 +490,12 @@ const DEFAULT_MODES: Record<string, ModeDetail> = {
       'Take partial profits at key target levels',
       'Let winning trade run to final Take Profit',
     ],
+    baseOptions: [
+      'Place Buy/Sell Order with preset SL & TP',
+      'Move Stop Loss to Break-Even at 1:1 R:R',
+      'Take partial profits at key target levels',
+      'Let winning trade run to final Take Profit',
+    ],
   },
   alerts: {
     title: 'Review & Journaling',
@@ -479,6 +504,12 @@ const DEFAULT_MODES: Record<string, ModeDetail> = {
     defaultAccent: 'rgba(220, 100, 0, 0.9)',
     defaultSoft: 'rgba(255, 140, 0, 0.18)',
     options: [
+      'Screenshot chart before and after trade',
+      'Log entry, exit, lot size, and PnL in Journal',
+      'Review trade execution against rules & mindset',
+      'Rate psychological discipline (1 - 5 stars)',
+    ],
+    baseOptions: [
       'Screenshot chart before and after trade',
       'Log entry, exit, lot size, and PnL in Journal',
       'Review trade execution against rules & mindset',
@@ -1031,6 +1062,7 @@ export default function App() {
             defaultAccent: existingModeData?.defaultAccent || accent,
             defaultSoft: existingModeData?.defaultSoft || soft,
             options: item.items,
+            baseOptions: [...item.items],
           };
 
           importedSelections[mKey] = [];
@@ -1202,13 +1234,19 @@ export default function App() {
             const mergedObj: Record<string, ModeDetail> = {};
             Object.keys(parsed).forEach((k) => {
               const def = DEFAULT_MODES[k];
+              const opts = Array.isArray(parsed[k]?.options) && parsed[k].options.length > 0 ? parsed[k].options : (def?.options || []);
+              const baseOpts = Array.isArray(parsed[k]?.baseOptions) && parsed[k].baseOptions.length > 0
+                ? parsed[k].baseOptions
+                : (def?.baseOptions || [...opts]);
+
               mergedObj[k] = {
                 title: parsed[k]?.title || def?.title || k,
                 accent: parsed[k]?.accent || def?.accent || 'rgba(30, 140, 255, 0.9)',
                 soft: parsed[k]?.soft || def?.soft || 'rgba(60, 170, 255, 0.18)',
                 defaultAccent: parsed[k]?.defaultAccent || def?.defaultAccent || 'rgba(30, 140, 255, 0.9)',
                 defaultSoft: parsed[k]?.defaultSoft || def?.defaultSoft || 'rgba(60, 170, 255, 0.18)',
-                options: Array.isArray(parsed[k]?.options) && parsed[k].options.length > 0 ? parsed[k].options : (def?.options || []),
+                options: opts,
+                baseOptions: baseOpts,
               };
             });
             if (Object.keys(mergedObj).length > 0) return mergedObj;
@@ -2000,6 +2038,12 @@ export default function App() {
     }
 
     if (moveCheckedToBottom) {
+      if (updatedSelections.length === 0) {
+        // Restoring options to original base order when no items remain checked
+        const base = modes[currentMode]?.baseOptions || DEFAULT_MODES[currentMode]?.options || updatedOptions;
+        updatedOptions = [...base];
+      }
+
       setModes((prev) => ({
         ...prev,
         [currentMode]: {
@@ -2017,18 +2061,44 @@ export default function App() {
   // ── Reset entire checklist indices ──
   const triggerResetChecklist = () => {
     if (editMode) {
-      // In edit mode - reset all checkboxes of ALL modes to blank empty values
+      // In edit mode (Reset all columns) - reset checkboxes and re-arrange options of ALL modes to original order
       const emptyChecklists: Record<string, number[]> = {};
+      const resetModes: Record<string, ModeDetail> = {};
+
       Object.keys(modes).forEach((m) => {
         emptyChecklists[m] = [];
         localStorage.setItem('fm_sel_' + m, JSON.stringify([]));
+
+        const base = modes[m]?.baseOptions || DEFAULT_MODES[m]?.options || modes[m]?.options || [];
+        resetModes[m] = {
+          ...modes[m],
+          options: [...base],
+          baseOptions: [...base],
+        };
       });
+
       setSelections(emptyChecklists);
+      setModes(resetModes);
+      localStorage.setItem('fm_modes', JSON.stringify(resetModes));
+      localStorage.setItem('fm_state_ver', '5.0');
     } else {
-      // Reset checkboxes of ONLY the selected current mode block
+      // Reset active column - reset checkboxes and re-arrange options of ONLY current mode to original order
       const nextSelections = { ...selections, [currentMode]: [] };
       setSelections(nextSelections);
       localStorage.setItem('fm_sel_' + currentMode, JSON.stringify([]));
+
+      const base = modes[currentMode]?.baseOptions || DEFAULT_MODES[currentMode]?.options || modes[currentMode]?.options || [];
+      const updatedModes = {
+        ...modes,
+        [currentMode]: {
+          ...modes[currentMode],
+          options: [...base],
+          baseOptions: [...base],
+        },
+      };
+      setModes(updatedModes);
+      localStorage.setItem('fm_modes', JSON.stringify(updatedModes));
+      localStorage.setItem('fm_state_ver', '5.0');
     }
     playSoundChime('reset');
   };
@@ -2058,14 +2128,24 @@ export default function App() {
   const commitItemEditing = (idx: number) => {
     if (editingItemIdx === null) return;
     const listCopy = [...modes[currentMode].options];
-    const finalVal = editingItemValue.trim() || listCopy[idx];
+    const oldVal = listCopy[idx];
+    const finalVal = editingItemValue.trim() || oldVal;
     listCopy[idx] = finalVal;
+
+    const baseCopy = [...(modes[currentMode].baseOptions || modes[currentMode].options)];
+    const baseIdx = baseCopy.indexOf(oldVal);
+    if (baseIdx !== -1) {
+      baseCopy[baseIdx] = finalVal;
+    } else if (baseCopy[idx] !== undefined) {
+      baseCopy[idx] = finalVal;
+    }
 
     setModes((prev) => ({
       ...prev,
       [currentMode]: {
         ...prev[currentMode],
         options: listCopy,
+        baseOptions: baseCopy,
       },
     }));
     setEditingItemIdx(null);
@@ -2076,12 +2156,18 @@ export default function App() {
     e.stopPropagation();
     if (modes[currentMode].options.length <= 1) return; // cannot delete of size 1
 
+    const deletedItem = modes[currentMode].options[idx];
     const updatedOptions = modes[currentMode].options.filter((_, i) => i !== idx);
+    const updatedBaseOptions = (modes[currentMode].baseOptions || modes[currentMode].options).filter(
+      (opt, i) => opt !== deletedItem && i !== idx
+    );
+
     setModes((prev) => ({
       ...prev,
       [currentMode]: {
         ...prev[currentMode],
         options: updatedOptions,
+        baseOptions: updatedBaseOptions,
       },
     }));
 
@@ -2102,11 +2188,13 @@ export default function App() {
   // ── Add dynamic item option checklist ──
   const addNewItemOption = () => {
     const listCopy = [...modes[currentMode].options, 'New option'];
+    const baseCopy = [...(modes[currentMode].baseOptions || modes[currentMode].options), 'New option'];
     setModes((prev) => ({
       ...prev,
       [currentMode]: {
         ...prev[currentMode],
         options: listCopy,
+        baseOptions: baseCopy,
       },
     }));
 
@@ -2135,7 +2223,7 @@ export default function App() {
 
     setModes(updatedModes);
     localStorage.setItem('fm_modes', JSON.stringify(updatedModes));
-    localStorage.setItem('fm_state_ver', '4.0');
+    localStorage.setItem('fm_state_ver', '5.0');
   };
 
   // ── Re-order checklist options within active mode ──
@@ -2148,16 +2236,32 @@ export default function App() {
     const [movedItem] = newOptions.splice(fromIdx, 1);
     newOptions.splice(toIdx, 0, movedItem);
 
+    const oldBase = [...(modes[currentMode].baseOptions || modes[currentMode].options)];
+    const itemToMove = oldOptions[fromIdx];
+    const baseFromIdx = oldBase.indexOf(itemToMove);
+    const targetItem = oldOptions[toIdx];
+    const baseToIdx = oldBase.indexOf(targetItem);
+
+    let newBaseOptions = oldBase;
+    if (baseFromIdx !== -1 && baseToIdx !== -1) {
+      newBaseOptions = [...oldBase];
+      const [movedBase] = newBaseOptions.splice(baseFromIdx, 1);
+      newBaseOptions.splice(baseToIdx, 0, movedBase);
+    } else {
+      newBaseOptions = [...newOptions];
+    }
+
     const updatedModes = {
       ...modes,
       [currentMode]: {
         ...modes[currentMode],
         options: newOptions,
+        baseOptions: newBaseOptions,
       },
     };
     setModes(updatedModes);
     localStorage.setItem('fm_modes', JSON.stringify(updatedModes));
-    localStorage.setItem('fm_state_ver', '4.0');
+    localStorage.setItem('fm_state_ver', '5.0');
 
     // Remap selections array for current mode so checked state stays with item text
     const oldSel = selections[currentMode] || [];
