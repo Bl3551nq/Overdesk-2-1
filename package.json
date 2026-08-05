@@ -4,6 +4,10 @@
   "version": "1.0.0",
   "description": "Overdesk Nexus - All-in-one transparent desktop dashboard widget.",
   "author": "Overdesk",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Bl3551nq/Overdesk-2-1.git"
+  },
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -27,7 +31,9 @@
       "requestedExecutionLevel": "asInvoker"
     },
     "publish": {
-      "provider": "github"
+      "provider": "github",
+      "owner": "Bl3551nq",
+      "repo": "Overdesk-2-1"
     },
     "directories": {
       "output": "dist-electron"
