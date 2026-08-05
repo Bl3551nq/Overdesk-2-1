@@ -1254,7 +1254,8 @@ body.editing .option { cursor: default; }
   stroke: currentColor;
 }
 .card.light .picker-item svg {
-  color: rgba(0, 0, 0, 0.82) !important;
+  color: #000000 !important;
+  stroke: #000000 !important;
 }
 
 .picker-item .custom-svg-icon {
@@ -1262,8 +1263,11 @@ body.editing .option { cursor: default; }
   height: 18px !important;
   color: rgba(255, 255, 255, 0.95) !important;
 }
-.card.light .picker-item .custom-svg-icon {
-  color: rgba(0, 0, 0, 0.82) !important;
+.card.light .picker-item .custom-svg-icon,
+.card.light .picker-item .custom-svg-icon svg {
+  color: #000000 !important;
+  fill: #000000 !important;
+  stroke: #000000 !important;
 }
 
 .picker-item img,
@@ -1355,24 +1359,29 @@ body.editing .option { cursor: default; }
   box-shadow: 0 0 1px 1px rgba(255, 255, 255, 0.9) inset, 0 8px 32px rgba(31, 38, 135, 0.15);
 }
 .card.light .picker-title {
-  color: rgba(0, 0, 0, 0.35);
+  color: rgba(0, 0, 0, 0.7) !important;
 }
 .card.light .picker-close {
-  background: rgba(0, 0, 0, 0.07);
-  color: rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.08);
+  color: #000000 !important;
 }
 .card.light .picker-close:hover {
   background: rgba(200, 0, 0, 0.1);
-  color: rgba(180, 0, 0, 0.85);
+  color: rgba(180, 0, 0, 0.85) !important;
 }
 .card.light .picker-item:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0.06);
+}
+.card.light .picker-item.current {
+  background: var(--accent-soft) !important;
+  border-color: var(--accent) !important;
 }
 .card.light .picker-item svg {
-  color: rgba(0, 0, 0, 0.65);
+  color: #000000 !important;
+  stroke: #000000 !important;
 }
 .card.light .picker-item span {
-  color: rgba(0, 0, 0, 0.35);
+  color: #000000 !important;
 }
 
 .color-row {
