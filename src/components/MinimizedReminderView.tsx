@@ -8,6 +8,7 @@ interface MinimizedReminderViewProps {
   isLight: boolean;
   accentSoft?: string;
   animateText?: boolean;
+  extraHeight?: number;
   setTempReminderText: (value: string) => void;
   setIsEditingReminder: (value: boolean) => void;
   handleSaveReminder: () => void;
@@ -115,26 +116,32 @@ const TypewriterText: React.FC<TypewriterTextProps> = ({
           wordBreak: 'break-word',
           textAlign: 'center',
           width: '100%',
-          display: 'block',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}
       >
-        {displayText}
-        <motion.span
-          animate={{ opacity: [1, 0] }}
-          transition={{
-            duration: 0.8,
-            repeat: Infinity,
-            repeatType: 'reverse',
-          }}
-          style={{
-            display: 'inline-block',
-            marginLeft: '2px',
-            color: 'var(--accent)',
-            fontWeight: 700,
-          }}
-        >
-          |
-        </motion.span>
+        <span style={{ position: 'relative', display: 'inline-block' }}>
+          {displayText}
+          <motion.span
+            animate={{ opacity: [1, 0] }}
+            transition={{
+              duration: 0.8,
+              repeat: Infinity,
+              repeatType: 'reverse',
+            }}
+            style={{
+              position: 'absolute',
+              left: '100%',
+              top: 0,
+              marginLeft: '2px',
+              color: 'var(--accent)',
+              fontWeight: 700,
+            }}
+          >
+            |
+          </motion.span>
+        </span>
       </span>
     </div>
   );
@@ -147,6 +154,7 @@ export const MinimizedReminderView: React.FC<MinimizedReminderViewProps> = ({
   isLight,
   accentSoft,
   animateText = true,
+  extraHeight = 0,
   setTempReminderText,
   setIsEditingReminder,
   handleSaveReminder,
@@ -165,16 +173,52 @@ export const MinimizedReminderView: React.FC<MinimizedReminderViewProps> = ({
     }
   };
 
+  const currentViewHeight = 68;
+
   return (
-    <div className="minimized-reminder-view animate-fade-in">
+    <div
+      className="minimized-reminder-view animate-fade-in no-drag"
+      style={{
+        WebkitAppRegion: 'no-drag' as any,
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 'auto',
+        padding: '0',
+      }}
+    >
       {isEditingReminder ? (
-        <div className="reminder-edit-wrap">
+        <div
+          className="reminder-edit-wrap no-drag"
+          style={{
+            WebkitAppRegion: 'no-drag' as any,
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            padding: '4px 0',
+          }}
+        >
           <textarea
             autoFocus
-            className="minimized-reminder-input"
+            className="minimized-reminder-input no-drag"
             value={tempReminderText}
             onChange={handleTextChange}
             maxLength={100}
+            onFocus={(e) => {
+              const len = e.target.value.length;
+              e.target.setSelectionRange(len, len);
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            onWheel={(e) => {
+              e.stopPropagation();
+              e.currentTarget.scrollTop += e.deltaY * 0.35;
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -187,8 +231,10 @@ export const MinimizedReminderView: React.FC<MinimizedReminderViewProps> = ({
             rows={2}
             style={{
               width: '100%',
-              background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.08)',
-              border: '1px solid ' + (isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)'),
+              minHeight: '42px',
+              maxHeight: '70px',
+              background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.1)',
+              border: '1.5px solid ' + (isLight ? 'rgba(0,0,0,0.22)' : 'rgba(255,255,255,0.3)'),
               borderRadius: '12px',
               color: 'var(--text)',
               fontSize: getReminderFontSize(tempReminderText),
@@ -199,39 +245,54 @@ export const MinimizedReminderView: React.FC<MinimizedReminderViewProps> = ({
               outline: 'none',
               resize: 'none',
               boxSizing: 'border-box',
-              lineHeight: 1.3,
+              lineHeight: 1.35,
+              WebkitAppRegion: 'no-drag' as any,
             }}
           />
-          <div className="reminder-btn-row">
+          <div
+            className="reminder-btn-row no-drag"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              width: '100%',
+              WebkitAppRegion: 'no-drag' as any,
+            }}
+          >
             <button
+              type="button"
               onClick={handleSaveReminder}
               style={{
                 background: 'var(--accent)',
                 color: '#fff',
                 border: 'none',
                 borderRadius: '999px',
-                padding: '4px 14px',
+                padding: '5px 16px',
                 fontSize: '11px',
                 fontWeight: 600,
                 cursor: 'pointer',
                 boxShadow: '0 2px 10px ' + (accentSoft || 'var(--accent-soft)'),
-                transition: 'opacity 0.15s',
+                transition: 'opacity 0.15s, transform 0.15s',
               }}
             >
               Save Reminder
             </button>
             <button
+              type="button"
               onClick={() => setIsEditingReminder(false)}
               style={{
                 background: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.12)',
                 color: 'var(--text)',
                 border: 'none',
                 borderRadius: '999px',
-                padding: '4px 12px',
+                padding: '5px 14px',
                 fontSize: '11px',
                 fontWeight: 600,
                 cursor: 'pointer',
-                transition: 'opacity 0.15s',
+                transition: 'opacity 0.15s, transform 0.15s',
               }}
             >
               Cancel
@@ -240,23 +301,26 @@ export const MinimizedReminderView: React.FC<MinimizedReminderViewProps> = ({
         </div>
       ) : (
         <div
-          className="reminder-text-display-wrap"
-          onDoubleClick={() => {
+          className="reminder-text-display-wrap no-drag"
+          onClick={(e) => {
+            e.stopPropagation();
             setTempReminderText(reminderText);
             setIsEditingReminder(true);
           }}
-          title="Double-click to edit reminder"
+          onMouseDown={(e) => e.stopPropagation()}
+          title="Click to edit reminder"
           style={{
             cursor: 'pointer',
             width: '100%',
-            height: '100%',
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '0 6px',
+            padding: '0 4px',
+            marginTop: '-2px',
             borderRadius: '12px',
             background: 'transparent',
+            position: 'relative',
+            WebkitAppRegion: 'no-drag' as any,
           }}
         >
           <div
@@ -293,7 +357,9 @@ export const MinimizedReminderView: React.FC<MinimizedReminderViewProps> = ({
                   wordBreak: 'break-word',
                   textAlign: 'center',
                   width: '100%',
-                  display: 'block',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
                 {reminderText}

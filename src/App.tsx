@@ -1319,6 +1319,40 @@ export default function App() {
     return 1.0;
   });
 
+  // Height Extension tracking (App 1 expanded & App 2 minimized)
+  const [expandedExtraHeight, setExpandedExtraHeight] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('fm_exp_extra_h');
+      if (saved) {
+        const parsed = parseFloat(saved);
+        if (!isNaN(parsed) && parsed >= 0) return parsed;
+      }
+    } catch (e) {}
+    return 0;
+  });
+
+  const [minimizedExtraHeight, setMinimizedExtraHeight] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('fm_min_extra_h');
+      if (saved) {
+        const parsed = parseFloat(saved);
+        if (!isNaN(parsed) && parsed >= 0) return parsed;
+      }
+    } catch (e) {}
+    return 0;
+  });
+
+  const [isResizingHeight, setIsResizingHeight] = useState<boolean>(false);
+  const checklistScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    localStorage.setItem('fm_exp_extra_h', expandedExtraHeight.toString());
+  }, [expandedExtraHeight]);
+
+  useEffect(() => {
+    localStorage.setItem('fm_min_extra_h', minimizedExtraHeight.toString());
+  }, [minimizedExtraHeight]);
+
   // Customizer picker state
   const [pickerOpen, setPickerOpen] = useState<boolean>(false);
   const [pickerTargetMode, setPickerTargetMode] = useState<string | null>(null);
@@ -1414,6 +1448,7 @@ export default function App() {
         curr.closest('.minimize-pill') ||
         curr.closest('.minimize-bar') ||
         curr.closest('.resize-handle') ||
+        curr.closest('.bottom-resize-handle') ||
         curr.closest('.reset-wrap') ||
         curr.closest('.color-swatch') ||
         curr.closest('.color-custom-wrap') ||
@@ -1869,7 +1904,43 @@ export default function App() {
         clearTimeout(transitionTimerRef.current);
       }
     };
-  }, [scale, minimized]);
+  }, [scale, minimized, expandedExtraHeight, minimizedExtraHeight]);
+
+  // ── Bottom Height Drag Extension Handler ──
+  const handleBottomResizeDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!cardRef.current || minimized) return;
+
+    const startY = e.clientY;
+    const isMin = minimized;
+    const currentExtra = isMin ? minimizedExtraHeight : expandedExtraHeight;
+    const currentCardH = cardRef.current.offsetHeight;
+    const baseH = Math.max(80, currentCardH - currentExtra);
+    const maxExtra = Math.round(baseH * 0.5); // Max 50% extension length
+
+    setIsResizingHeight(true);
+
+    const handlePointerMove = (moveEv: PointerEvent) => {
+      moveEv.preventDefault();
+      const dy = (moveEv.clientY - startY) / scale;
+      const nextExtra = Math.max(0, Math.min(maxExtra, Math.round(currentExtra + dy)));
+      if (isMin) {
+        setMinimizedExtraHeight(nextExtra);
+      } else {
+        setExpandedExtraHeight(nextExtra);
+      }
+    };
+
+    const handlePointerUp = () => {
+      setIsResizingHeight(false);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+  };
 
   // ── Programmatic Scaling Configurations ──
   const sizingRef = useRef({ dragging: false, startX: 0, startScale: 1.0 });
@@ -2536,9 +2607,9 @@ export default function App() {
         style={{
           transform: `translate(${translate.x}px, ${translate.y}px) scale(${isGripped ? 1.035 : 1})`,
           boxShadow: !licenseActive ? 'none' : (isGripped ? `0 20px 50px -5px ${modes[currentMode]?.soft || 'var(--accent-soft)'}, 0 8px 24px -2px rgba(0, 0, 0, 0.45)` : undefined),
-          transition: isGripped ? 'transform 0s, box-shadow 0.2s ease' : 'transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, padding 0.35s cubic-bezier(0.4, 0, 0.2, 1), min-height 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+          transition: (isGripped || isResizingHeight) ? 'transform 0s, box-shadow 0.2s ease' : 'transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, padding 0.35s cubic-bezier(0.4, 0, 0.2, 1), min-height 0.25s cubic-bezier(0.16, 1, 0.3, 1), height 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
           cursor: isGripped ? 'grabbing' : undefined,
-          minHeight: (settingsOpen && !minimized) ? '420px' : undefined,
+          minHeight: (settingsOpen && !minimized) ? `${420 + expandedExtraHeight}px` : undefined,
           position: 'relative',
           overflow: 'hidden',
         }}
@@ -2770,16 +2841,24 @@ export default function App() {
               </button>
 
               <button
-                className={`edit-toggle ${editMode ? 'on' : ''}`}
+                className={`edit-toggle ${(minimized ? isEditingReminder : editMode) ? 'on' : ''}`}
                 id="edit-toggle"
                 onClick={() => {
-                  if (minimized) setMinimized(false);
-                  setEditMode(!editMode);
-                  setSettingsOpen(false);
-                  setEditingTitle(false);
-                  setEditingItemIdx(null);
+                  if (minimized) {
+                    if (isEditingReminder) {
+                      setIsEditingReminder(false);
+                    } else {
+                      setTempReminderText(reminderText);
+                      setIsEditingReminder(true);
+                    }
+                  } else {
+                    setEditMode(!editMode);
+                    setSettingsOpen(false);
+                    setEditingTitle(false);
+                    setEditingItemIdx(null);
+                  }
                 }}
-                title="Edit List Configurations"
+                title={minimized ? (isEditingReminder ? "Close Reminder Editor" : "Edit Reminder") : "Edit List Configurations"}
               >
                 {editMode ? (
                   <svg viewBox="0 0 24 24">
@@ -2894,6 +2973,7 @@ export default function App() {
             isLight={isLight}
             accentSoft={modes[currentMode]?.soft}
             animateText={animateMinimizedText}
+            extraHeight={minimizedExtraHeight}
             setTempReminderText={setTempReminderText}
             setIsEditingReminder={setIsEditingReminder}
             handleSaveReminder={handleSaveReminder}
@@ -4208,8 +4288,23 @@ export default function App() {
 
         {/* Dynamic Items list area */}
         <div className="card-body">
-          <div className={`scroll-area ${isChecklistScrolling ? 'is-scrolling' : ''}`} onScroll={handleChecklistScroll}>
-            <ul className="options" id="options-list">
+          {(() => {
+            const currentContentScrollH = checklistScrollRef.current?.scrollHeight || 176;
+            const contentNeededExtra = Math.max(0, currentContentScrollH - 176);
+            const effectiveChecklistExtra = Math.min(expandedExtraHeight, contentNeededExtra);
+            const activeScrollAreaHeight = 176 + effectiveChecklistExtra;
+
+            return (
+              <div
+                className={`scroll-area ${isChecklistScrolling ? 'is-scrolling' : ''}`}
+                onScroll={handleChecklistScroll}
+                ref={checklistScrollRef}
+                style={{
+                  height: `${activeScrollAreaHeight}px`,
+                  maxHeight: `${activeScrollAreaHeight}px`,
+                }}
+              >
+                <ul className="options" id="options-list">
               {modes[currentMode]?.options.map((itemText, optionIdx) => {
                 const isItemChecked = (selections[currentMode] || []).includes(optionIdx);
                 const isEditingItem = editingItemIdx === optionIdx;
@@ -4375,6 +4470,8 @@ export default function App() {
               </button>
             )}
           </div>
+          );
+        })()}
 
           {/* Reset tab-checkboxes trigger */}
           <div className="reset-wrap font-sans" onClick={triggerResetChecklist} style={{ userSelect: 'none' }}>
@@ -4401,6 +4498,45 @@ export default function App() {
           />
         </div>
           </>
+        )}
+
+        {/* Bottom Height Resize Handle */}
+        {!minimized && (
+          <div
+            className="bottom-resize-handle no-drag"
+            onPointerDown={handleBottomResizeDown}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              setExpandedExtraHeight(0);
+            }}
+            title="Drag down to extend height (Double click to reset)"
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '70px',
+              height: '16px',
+              cursor: 'ns-resize',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 90,
+              WebkitAppRegion: 'no-drag' as any,
+            }}
+          >
+            <div
+              className="bottom-handle-bar"
+              style={{
+                width: '32px',
+                height: '3.5px',
+                borderRadius: '99px',
+                background: isLight ? 'rgba(0, 0, 0, 0.25)' : 'rgba(255, 255, 255, 0.3)',
+                transition: 'background 0.2s, width 0.2s, height 0.2s',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+              }}
+            />
+          </div>
         )}
       </div>
     </div>

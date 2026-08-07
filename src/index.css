@@ -62,6 +62,13 @@ body.electron .title-container-editable, body.electron .edit-title-btn,
 body.electron .title-input, body.electron .mode-label, body.electron a, body.electron select, body.electron .settings-body, body.electron .setting-section,
 body.electron .picker-grid,
 body.electron .no-drag,
+body.electron .minimized-reminder-view,
+body.electron .reminder-edit-wrap,
+body.electron .reminder-text-display-wrap,
+body.electron .minimized-reminder-input,
+body.electron .minimized-reminder-text,
+body.electron .reminder-btn-row,
+body.electron textarea,
 body.electron input[type="range"],
 body.electron input[type="range"]::-webkit-slider-thumb,
 body.electron input[type="range"]::-webkit-slider-runnable-track {
@@ -248,6 +255,15 @@ body.electron input[type="range"]::-webkit-slider-runnable-track {
   height: 5px;
   opacity: 1;
   filter: brightness(1.3);
+}
+
+.card.minimized {
+  padding: 12px 18px 12px !important;
+  min-height: auto !important;
+}
+
+.card.minimized .top-bar {
+  margin-bottom: 4px !important;
 }
 
 /* ── Control Buttons ── */
@@ -668,100 +684,18 @@ body.editing .icon-btn::after {
   text-shadow: 0 1px 4px rgba(255, 255, 255, 0.85);
 }
 
-.divider {
-  height: 0.5px;
-  background: var(--divider);
-  margin-bottom: 0;
-  flex-shrink: 0;
-  max-height: 10px;
-  opacity: 1;
-  overflow: hidden;
-  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1), margin 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+.minimized-reminder-input {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  scroll-behavior: smooth !important;
+  -webkit-app-region: no-drag !important;
+}
+.minimized-reminder-input::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
-/* ═══════════════════════════════════════════════════════
-   SCROLL SYSTEM / OPTIONS LIST
-═══════════════════════════════════════════════════════ */
-.card-body {
-  overflow: hidden;
-  max-height: 600px;
-  opacity: 1;
-  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.card.minimized .card-body {
-  max-height: 0;
-  opacity: 0;
-  pointer-events: none;
-}
-.card {
-  transition: padding 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.card.minimized {
-  padding-top: 14px;
-  padding-bottom: 0px;
-}
-.card.minimized .top-bar {
-  margin-bottom: 0px;
-}
-
-/* Minimized Reminder View Styling */
-.minimized-reminder-view {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  align-items: center;
-  justify-content: center;
-  padding: 2px 6px;
-  box-sizing: border-box;
-  height: 80px;
-  min-height: 80px;
-  max-height: 80px;
-  text-align: center;
-  position: relative;
-  overflow: hidden;
-}
-
-.reminder-edit-wrap {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-.reminder-btn-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.reminder-edit-hint {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 4px;
-  opacity: 0.4;
-  color: var(--text-dim);
-  transition: opacity 0.2s;
-}
-
-.reminder-text-display-wrap:hover .reminder-edit-hint {
-  opacity: 0.9;
-}
-
-.reminder-edit-icon {
-  width: 12px;
-  height: 12px;
-  stroke: currentColor;
-  fill: none;
-  stroke-width: 2;
-}
-
-/* ═══════════════════════════════════════════════════════
-   EVERYDAY REMINDER (MINIMIZED VIEW)
-═══════════════════════════════════════════════════════ */
 @keyframes reminderPulse10s {
   0%, 82%, 100% {
     transform: scale(1);
@@ -788,8 +722,7 @@ body.editing .icon-btn::after {
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
-/* No background highlight on hover for reminder text display wrap */
-
+/* Scroll area styling - Invisible scrollbar while allowing scroll */
 .scroll-area {
   overflow-y: auto;
   overflow-x: hidden;
@@ -799,32 +732,16 @@ body.editing .icon-btn::after {
   padding-right: 0;
   height: 176px;
   flex-shrink: 0;
-  scrollbar-width: none;
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
 }
 .scroll-area::-webkit-scrollbar {
-  width: 4px;
-}
-.scroll-area::-webkit-scrollbar-track {
-  background: transparent;
-  border-radius: 99px;
-}
-.scroll-area::-webkit-scrollbar-thumb {
-  background: transparent;
-  border-radius: 99px;
-}
-.scroll-area.is-scrolling {
-  scrollbar-width: thin;
-  scrollbar-color: var(--accent) transparent;
-}
-.scroll-area.is-scrolling::-webkit-scrollbar-track {
-  background: var(--opt-hover);
-}
-.scroll-area.is-scrolling::-webkit-scrollbar-thumb {
-  background: var(--accent);
-  box-shadow: 0 0 6px 1px var(--accent-soft);
-}
-.scroll-area.is-scrolling::-webkit-scrollbar-thumb:hover {
-  background: var(--text);
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 .options {
@@ -1100,6 +1017,13 @@ body.editing .option { cursor: default; }
   width: 12px;
 }
 
+.bottom-resize-handle:hover .bottom-handle-bar {
+  background: var(--accent) !important;
+  width: 44px !important;
+  height: 4.5px !important;
+  box-shadow: 0 0 8px var(--accent-soft) !important;
+}
+
 /* ═══════════════════════════════════════════════════════
    MODE CUSTOMIZATION OVERLAY (Icon Picker)
 ═══════════════════════════════════════════════════════ */
@@ -1127,7 +1051,7 @@ body.editing .option { cursor: default; }
 
 .settings-body {
   overflow-y: auto !important;
-  max-height: 350px;
+  max-height: none !important;
   padding-right: 4px;
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
