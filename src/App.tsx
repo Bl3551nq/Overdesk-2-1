@@ -2634,7 +2634,7 @@ export default function App() {
           boxShadow: !licenseActive ? 'none' : (isGripped ? `0 20px 50px -5px ${modes[currentMode]?.soft || 'var(--accent-soft)'}, 0 8px 24px -2px rgba(0, 0, 0, 0.45)` : undefined),
           transition: (isGripped || isResizingHeight) ? 'transform 0s, box-shadow 0.2s ease' : 'transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, padding 0.35s cubic-bezier(0.4, 0, 0.2, 1), min-height 0.25s cubic-bezier(0.16, 1, 0.3, 1), height 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
           cursor: isGripped ? 'grabbing' : undefined,
-          minHeight: (settingsOpen && !minimized) ? `${420 + expandedExtraHeight}px` : undefined,
+          minHeight: !minimized ? (activeApp === 'calendar' ? `${340 + expandedExtraHeight}px` : (settingsOpen ? `${420 + expandedExtraHeight}px` : undefined)) : undefined,
           position: 'relative',
           overflow: 'hidden',
         }}
@@ -2757,8 +2757,10 @@ export default function App() {
           <div className="update-banner-text">
             {updateError ? (
               <span style={{ color: '#f87171' }}>
-                {updateError.includes('http') || updateError.includes('github')
-                  ? 'Update unavailable (Release setup in progress)'
+                {updateError.includes('404')
+                  ? 'Release package not found on server (404)'
+                  : updateError.includes('github') || updateError.includes('http') || updateError.includes('releases/download')
+                  ? 'Update download failed. Please try again later.'
                   : updateError}
               </span>
             ) : updateDownloaded ? (
