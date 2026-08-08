@@ -260,10 +260,11 @@ body.electron input[type="range"]::-webkit-slider-runnable-track {
 .card.minimized {
   padding: 12px 18px 12px !important;
   min-height: auto !important;
+  border-radius: 36px !important;
 }
 
 .card.minimized .top-bar {
-  margin-bottom: 4px !important;
+  margin-bottom: 6px !important;
 }
 
 /* ── Control Buttons ── */
