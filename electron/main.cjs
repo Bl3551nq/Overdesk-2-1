@@ -278,7 +278,14 @@ autoUpdater.on('update-downloaded', () => {
 autoUpdater.on('error', (err) => {
   console.error('AutoUpdater error:', err);
   if (mainWindow) {
-    mainWindow.webContents.send('update-error', err ? (err.message || String(err)) : 'Unknown update error');
+    let cleanMessage = 'Update failed to download. Please check back later.';
+    const rawMsg = err ? (err.message || String(err)) : '';
+    if (rawMsg.includes('404')) {
+      cleanMessage = 'Update package not found or release upload in progress (404).';
+    } else if (rawMsg.includes('net::ERR_') || rawMsg.includes('ENOTFOUND')) {
+      cleanMessage = 'Network error while checking for update.';
+    }
+    mainWindow.webContents.send('update-error', cleanMessage);
   }
 });
 

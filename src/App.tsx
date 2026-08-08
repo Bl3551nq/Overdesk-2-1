@@ -2756,7 +2756,11 @@ export default function App() {
         <div className={`update-banner ${updateAvailable ? 'show' : ''}`} id="update-banner">
           <div className="update-banner-text">
             {updateError ? (
-              <span style={{ color: '#f87171' }}>Error: {updateError}</span>
+              <span style={{ color: '#f87171' }}>
+                {updateError.includes('http') || updateError.includes('github')
+                  ? 'Update unavailable (Release setup in progress)'
+                  : updateError}
+              </span>
             ) : updateDownloaded ? (
               <>
                 Update ready <span id="update-version">v{updateVersion}</span>
