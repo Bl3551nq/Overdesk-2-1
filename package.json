@@ -28,7 +28,8 @@
         "nsis"
       ],
       "icon": "electron/icon.png",
-      "requestedExecutionLevel": "asInvoker"
+      "requestedExecutionLevel": "asInvoker",
+      "artifactName": "Overdesk-Nexus-Setup-${version}.${ext}"
     },
     "publish": {
       "provider": "github",

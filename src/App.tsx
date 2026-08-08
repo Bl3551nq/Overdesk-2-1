@@ -2757,10 +2757,8 @@ export default function App() {
           <div className="update-banner-text">
             {updateError ? (
               <span style={{ color: '#f87171' }}>
-                {updateError.includes('404')
-                  ? 'Release package not found on server (404)'
-                  : updateError.includes('github') || updateError.includes('http') || updateError.includes('releases/download')
-                  ? 'Update download failed. Please try again later.'
+                {typeof updateError === 'string' && (updateError.includes('404') || updateError.includes('github') || updateError.includes('http') || updateError.includes('releases/download'))
+                  ? 'Update package file not found on GitHub release (404).'
                   : updateError}
               </span>
             ) : updateDownloaded ? (
