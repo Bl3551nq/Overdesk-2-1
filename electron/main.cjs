@@ -242,6 +242,11 @@ function createTray() {
   });
 }
 
+// Ensure isQuitting is set to true when app is quitting (e.g. via autoUpdater or OS shutdown)
+app.on('before-quit', () => {
+  isQuitting = true;
+});
+
 // Configure autoUpdater
 autoUpdater.on('update-available', (info) => {
   if (mainWindow) {
@@ -728,5 +733,6 @@ ipcMain.on('save-icon', (event, dataUrl) => {
 });
 
 ipcMain.on('install-update', () => {
-  autoUpdater.quitAndInstall();
+  isQuitting = true;
+  autoUpdater.quitAndInstall(false, true);
 });
