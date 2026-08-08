@@ -34,8 +34,10 @@ declare global {
       scaleEnd: (scale: number) => void;
       setIgnoreMouseEvents: (ignore: boolean, options?: { forward: boolean }) => void;
       installUpdate: () => void;
-      onUpdateAvailable: (cb: (version: string) => void) => void;
-      onUpdateDownloaded: (cb: () => void) => void;
+      onUpdateAvailable?: (cb: (version: string) => void) => void;
+      onDownloadProgress?: (cb: (percent: number) => void) => void;
+      onUpdateDownloaded?: (cb: () => void) => void;
+      onUpdateError?: (cb: (err: string) => void) => void;
     };
   }
 }
@@ -1379,7 +1381,10 @@ export default function App() {
   // Auto Updater State
   const [updateAvailable, setUpdateAvailable] = useState<boolean>(false);
   const [updateVersion, setUpdateVersion] = useState<string>('');
+  const [updateProgress, setUpdateProgress] = useState<number | null>(null);
+  const [updateDownloaded, setUpdateDownloaded] = useState<boolean>(false);
   const [updateInstalling, setUpdateInstalling] = useState<boolean>(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   // Card Draggability (pointer-based with long press) State
   const [translate, setTranslate] = useState<{ x: number; y: number }>(() => {
@@ -1675,14 +1680,34 @@ export default function App() {
       });
 
       // Hook up Electron automatic updater listeners
-      window.electronAPI.onUpdateAvailable((version) => {
-        setUpdateVersion(version);
-        setUpdateAvailable(true);
-      });
+      if (window.electronAPI.onUpdateAvailable) {
+        window.electronAPI.onUpdateAvailable((version) => {
+          setUpdateVersion(version);
+          setUpdateAvailable(true);
+          setUpdateDownloaded(false);
+          setUpdateError(null);
+        });
+      }
 
-      window.electronAPI.onUpdateDownloaded(() => {
-        setUpdateVersion((prev) => prev + ' (Ready)');
-      });
+      if (window.electronAPI.onDownloadProgress) {
+        window.electronAPI.onDownloadProgress((percent) => {
+          setUpdateProgress(percent);
+        });
+      }
+
+      if (window.electronAPI.onUpdateDownloaded) {
+        window.electronAPI.onUpdateDownloaded(() => {
+          setUpdateDownloaded(true);
+          setUpdateProgress(100);
+        });
+      }
+
+      if (window.electronAPI.onUpdateError) {
+        window.electronAPI.onUpdateError((err) => {
+          setUpdateError(err);
+          setUpdateInstalling(false);
+        });
+      }
     }
   }, []);
 
@@ -2730,11 +2755,27 @@ export default function App() {
         {/* Automatic updates banner notifier */}
         <div className={`update-banner ${updateAvailable ? 'show' : ''}`} id="update-banner">
           <div className="update-banner-text">
-            Update available
-            <span id="update-version">{updateVersion}</span>
+            {updateError ? (
+              <span style={{ color: '#f87171' }}>Error: {updateError}</span>
+            ) : updateDownloaded ? (
+              <>
+                Update ready <span id="update-version">v{updateVersion}</span>
+              </>
+            ) : (
+              <>
+                Downloading update <span id="update-version">v{updateVersion}</span>
+                {updateProgress !== null && ` (${updateProgress}%)`}
+              </>
+            )}
           </div>
           <button className="update-install-btn" id="update-install-btn" onClick={executeUpdateInstall}>
-            {updateInstalling ? 'Installing...' : 'Install'}
+            {updateInstalling
+              ? updateDownloaded
+                ? 'Restarting...'
+                : 'Installing when ready...'
+              : updateDownloaded
+              ? 'Restart & Install'
+              : 'Install Update'}
           </button>
         </div>
 

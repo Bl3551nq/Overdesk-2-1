@@ -248,15 +248,37 @@ app.on('before-quit', () => {
 });
 
 // Configure autoUpdater
+let isUpdateDownloaded = false;
+let userRequestedInstall = false;
+
 autoUpdater.on('update-available', (info) => {
+  isUpdateDownloaded = false;
   if (mainWindow) {
     mainWindow.webContents.send('update-available', info.version);
   }
 });
 
+autoUpdater.on('download-progress', (progressObj) => {
+  if (mainWindow) {
+    mainWindow.webContents.send('download-progress', Math.round(progressObj.percent));
+  }
+});
+
 autoUpdater.on('update-downloaded', () => {
+  isUpdateDownloaded = true;
   if (mainWindow) {
     mainWindow.webContents.send('update-downloaded');
+  }
+  if (userRequestedInstall) {
+    isQuitting = true;
+    autoUpdater.quitAndInstall(false, true);
+  }
+});
+
+autoUpdater.on('error', (err) => {
+  console.error('AutoUpdater error:', err);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-error', err ? (err.message || String(err)) : 'Unknown update error');
   }
 });
 
@@ -733,6 +755,9 @@ ipcMain.on('save-icon', (event, dataUrl) => {
 });
 
 ipcMain.on('install-update', () => {
-  isQuitting = true;
-  autoUpdater.quitAndInstall(false, true);
+  userRequestedInstall = true;
+  if (isUpdateDownloaded) {
+    isQuitting = true;
+    autoUpdater.quitAndInstall(false, true);
+  }
 });
