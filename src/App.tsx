@@ -1942,7 +1942,7 @@ export default function App() {
     const currentExtra = isMin ? minimizedExtraHeight : expandedExtraHeight;
     const currentCardH = cardRef.current.offsetHeight;
     const baseH = Math.max(80, currentCardH - currentExtra);
-    const maxExtra = Math.round(baseH * 0.5); // Max 50% extension length
+    const maxExtra = 1500; // Allow extending height significantly beyond previous max limits
 
     setIsResizingHeight(true);
 
@@ -4330,10 +4330,7 @@ export default function App() {
         {/* Dynamic Items list area */}
         <div className="card-body">
           {(() => {
-            const currentContentScrollH = checklistScrollRef.current?.scrollHeight || 176;
-            const contentNeededExtra = Math.max(0, currentContentScrollH - 176);
-            const effectiveChecklistExtra = Math.min(expandedExtraHeight, contentNeededExtra);
-            const activeScrollAreaHeight = 176 + effectiveChecklistExtra;
+            const activeScrollAreaHeight = 176 + expandedExtraHeight;
 
             return (
               <div
@@ -4536,6 +4533,7 @@ export default function App() {
             onBackToChecklist={() => setActiveApp('checklist')}
             settingsPanelOpen={calendarSettingsOpen}
             setSettingsPanelOpen={setCalendarSettingsOpen}
+            extraHeight={expandedExtraHeight}
           />
         </div>
           </>

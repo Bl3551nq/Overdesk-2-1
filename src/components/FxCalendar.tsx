@@ -279,6 +279,7 @@ interface FxCalendarProps {
   setSettingsPanelOpen?: (open: boolean) => void;
   minimized?: boolean;
   setMinimized?: (minimized: boolean) => void;
+  extraHeight?: number;
 }
 
 const FLAG_MAP: Record<string, string> = {
@@ -422,7 +423,8 @@ export default function FxCalendar({
   settingsPanelOpen: externalSettingsPanelOpen,
   setSettingsPanelOpen: externalSetSettingsPanelOpen,
   minimized,
-  setMinimized
+  setMinimized,
+  extraHeight = 0
 }: FxCalendarProps) {
   // Settings Persistence
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
@@ -1395,7 +1397,7 @@ export default function FxCalendar({
     <div className="fx-container font-sans" style={{
       display: 'flex',
       flexDirection: 'column',
-      height: '340px',
+      height: `${340 + extraHeight}px`,
       boxSizing: 'border-box',
       overflow: 'hidden',
       position: 'relative',
