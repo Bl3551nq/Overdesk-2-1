@@ -1,8 +1,9 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  checkLicense: () => ipcRenderer.invoke('check-license'),
+  checkLicense: (simDay) => ipcRenderer.invoke('check-license', simDay),
   validateLicense: (key) => ipcRenderer.invoke('validate-license', key),
+  startTrial: () => ipcRenderer.invoke('start-trial'),
   closeApp: () => ipcRenderer.send('close-app'),
   triggerAlarmNotification: (title, body) => ipcRenderer.send('trigger-alarm-notification', title, body),
   setHeight: (height) => ipcRenderer.send('set-height', height),
@@ -11,9 +12,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   scaleEnd: (scale) => ipcRenderer.send('scale-end', scale),
   setIgnoreMouseEvents: (ignore, options) => ipcRenderer.send('set-ignore-mouse-events', ignore, options),
   saveIcon: (dataUrl) => ipcRenderer.send('save-icon', dataUrl),
+  checkForUpdates: () => ipcRenderer.send('check-for-updates'),
   installUpdate: () => ipcRenderer.send('install-update'),
+  onCheckingForUpdate: (cb) => {
+    ipcRenderer.on('checking-for-update', () => cb());
+  },
   onUpdateAvailable: (cb) => {
     ipcRenderer.on('update-available', (event, version) => cb(version));
+  },
+  onUpdateNotAvailable: (cb) => {
+    ipcRenderer.on('update-not-available', (event, version) => cb(version));
   },
   onDownloadProgress: (cb) => {
     ipcRenderer.on('download-progress', (event, percent) => cb(percent));

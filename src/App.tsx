@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import overdeskLogo from './logo.svg';
 import FxCalendar, { playSynthSound } from './components/FxCalendar';
 import { MinimizedReminderView } from './components/MinimizedReminderView';
 import { Glass } from './components/Glass';
 import GooeyNav, { triggerGooeyParticles } from './components/GooeyNav';
+import { renderFormattedMarkdown } from './utils/textFormatter';
 
 import wallpaperGokuBack from './assets/images/goku_back_focus_1785507323174.jpg';
 import wallpaperBullBear from './assets/images/bull_bear_chart_1785507336627.jpg';
@@ -11,6 +13,7 @@ import wallpaperNeonCandles from './assets/images/neon_candlesticks_178550734793
 import wallpaperCyberTunnel from './assets/images/cyber_trading_tunnel_1785507362848.jpg';
 import wallpaperAnimeDiscipline from './assets/images/anime_discipline_1785507376413.jpg';
 import wallpaperGokuSilhouette from './assets/images/goku_silhouette_focus_1785507390062.jpg';
+import wallpaperMoonTrader from './assets/images/moon_trader_candlesticks_1786274245256.jpg';
 
 const PRESET_WALLPAPERS = [
   { id: 'goku_back_focus', name: 'Goku Focus Back', url: wallpaperGokuBack },
@@ -19,22 +22,46 @@ const PRESET_WALLPAPERS = [
   { id: 'cyber_trading_tunnel', name: 'Cyber Trading Tunnel', url: wallpaperCyberTunnel },
   { id: 'anime_discipline', name: 'Discipline Pushups', url: wallpaperAnimeDiscipline },
   { id: 'goku_silhouette_focus', name: 'Goku Focus Front', url: wallpaperGokuSilhouette },
+  { id: 'moon_trader_candlesticks', name: 'Moon Trader Charts', url: wallpaperMoonTrader },
 ];
 
 // Declaration to access global Electron API from preload script
 declare global {
   interface Window {
     electronAPI?: {
-      checkLicense: () => Promise<{ ok: boolean; key?: string }>;
-      validateLicense: (key: string) => Promise<{ ok: boolean; test?: boolean; error?: string }>;
+      checkLicense: (simDay?: number) => Promise<{
+        ok: boolean;
+        isTrial?: boolean;
+        trialStarted?: boolean;
+        trialUsed?: boolean;
+        licenseValid?: boolean;
+        trialExpired?: boolean;
+        licenseExpired?: boolean;
+        dayNumber?: number;
+        daysLeft?: number;
+        hoursLeft?: number;
+        planType?: 'annual' | 'lifetime' | 'trial';
+        variantName?: string;
+        key?: string;
+        expiresAt?: number | null;
+        trialStartDate?: number;
+        machineId?: string;
+        ip?: string;
+        error?: string;
+      }>;
+      validateLicense: (key: string) => Promise<{ ok: boolean; test?: boolean; error?: string; isTrial?: boolean; planType?: 'annual' | 'lifetime' | 'trial'; variantName?: string; expiresAt?: number | null; daysRemaining?: number }>;
+      startTrial: () => Promise<{ ok: boolean; isTrial?: boolean; trialStarted?: boolean; trialUsed?: boolean; trialExpired?: boolean; dayNumber?: number; daysLeft?: number; hoursLeft?: number; trialStartDate?: number; error?: string }>;
       closeApp: () => void;
       setHeight: (height: number) => void;
       cardBounds: (bounds: { x: number; y: number; w: number; h: number; scale?: number }) => void;
       scaleStart: () => void;
       scaleEnd: (scale: number) => void;
       setIgnoreMouseEvents: (ignore: boolean, options?: { forward: boolean }) => void;
+      checkForUpdates?: () => void;
       installUpdate: () => void;
+      onCheckingForUpdate?: (cb: () => void) => void;
       onUpdateAvailable?: (cb: (version: string) => void) => void;
+      onUpdateNotAvailable?: (cb: (version: string) => void) => void;
       onDownloadProgress?: (cb: (percent: number) => void) => void;
       onUpdateDownloaded?: (cb: () => void) => void;
       onUpdateError?: (cb: (err: string) => void) => void;
@@ -558,6 +585,13 @@ export default function App() {
   const [currentMode, setCurrentMode] = useState<string>('business');
   const [editMode, setEditMode] = useState<boolean>(false);
   const [isLight, setIsLight] = useState<boolean>(false);
+  const [isEyeMode, setIsEyeMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('fm_eye_mode') === '1';
+    } catch (e) {
+      return false;
+    }
+  });
   const [minimized, setMinimized] = useState<boolean>(false);
 
   // Countdown Timer State
@@ -615,6 +649,35 @@ export default function App() {
     }
   });
 
+  // Full Mode State: Displays individual checklist items occupying the mode in big fonts with Next/Back navigation
+  const [fullMode, setFullMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('fm_full_mode') === '1';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const [fullModeIndices, setFullModeIndices] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem('fm_full_mode_indices');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return {};
+  });
+
+  const handleFullModeChange = (val: boolean) => {
+    setFullMode(val);
+    localStorage.setItem('fm_full_mode', val ? '1' : '0');
+    if (val) {
+      setFullModeIndices((prev) => {
+        const next = { ...prev, [currentMode]: prev[currentMode] ?? 0 };
+        localStorage.setItem('fm_full_mode_indices', JSON.stringify(next));
+        return next;
+      });
+    }
+  };
+
   const [isChecklistScrolling, setIsChecklistScrolling] = useState(false);
   const checklistScrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -654,6 +717,70 @@ export default function App() {
     setMoveCheckedToBottom(val);
     localStorage.setItem('fm_move_checked_bottom', String(val));
   };
+
+  const [autoResetDaily, setAutoResetDaily] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('fm_auto_reset_daily');
+      return saved === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const handleAutoResetDailyChange = (val: boolean) => {
+    setAutoResetDaily(val);
+    localStorage.setItem('fm_auto_reset_daily', String(val));
+    if (val) {
+      const d = new Date();
+      const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      if (!localStorage.getItem('fm_last_auto_reset_date')) {
+        localStorage.setItem('fm_last_auto_reset_date', todayStr);
+      }
+    }
+  };
+
+  // Auto-reset daily midnight checker
+  useEffect(() => {
+    if (!autoResetDaily) return;
+
+    const checkMidnightReset = () => {
+      const d = new Date();
+      const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const lastResetStr = localStorage.getItem('fm_last_auto_reset_date');
+
+      if (!lastResetStr) {
+        localStorage.setItem('fm_last_auto_reset_date', todayStr);
+      } else if (lastResetStr !== todayStr) {
+        // Local midnight has passed -> Clear all checked items across all modes
+        const emptyChecklists: Record<string, number[]> = {};
+
+        setModes((prevModes) => {
+          const resetModes: Record<string, ModeDetail> = {};
+          Object.keys(prevModes).forEach((m) => {
+            emptyChecklists[m] = [];
+            localStorage.setItem('fm_sel_' + m, JSON.stringify([]));
+
+            const base = prevModes[m]?.baseOptions || DEFAULT_MODES[m]?.options || prevModes[m]?.options || [];
+            resetModes[m] = {
+              ...prevModes[m],
+              options: [...base],
+              baseOptions: [...base],
+            };
+          });
+          localStorage.setItem('fm_modes', JSON.stringify(resetModes));
+          localStorage.setItem('fm_state_ver', '5.0');
+          return resetModes;
+        });
+
+        setSelections(emptyChecklists);
+        localStorage.setItem('fm_last_auto_reset_date', todayStr);
+      }
+    };
+
+    checkMidnightReset();
+    const interval = setInterval(checkMidnightReset, 10000);
+    return () => clearInterval(interval);
+  }, [autoResetDaily]);
 
   const [animationsEnabled, setAnimationsEnabled] = useState<boolean>(() => {
     try {
@@ -1140,6 +1267,7 @@ export default function App() {
     setAnimateMinimizedText(true);
     setAnimationsEnabled(true);
     setMoveCheckedToBottom(true);
+    setAutoResetDaily(false);
     setWallpaperUrl(wallpaperGokuBack);
     setCustomWallpapers([]);
     setWallpaperOpacity(60);
@@ -1204,8 +1332,38 @@ export default function App() {
     return '21px';
   };
 
-  // License State
-  const [licenseActive, setLicenseActive] = useState<boolean>(true); // active by default in web preview
+  // License & 5-Day Persistent Trial State
+  const [licenseActive, setLicenseActiveState] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('fm_license_active') === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  const setLicenseActive = (active: boolean) => {
+    setLicenseActiveState(active);
+    try {
+      localStorage.setItem('fm_license_active', active ? '1' : '0');
+    } catch {}
+  };
+  const [isTrial, setIsTrial] = useState<boolean>(false);
+  const [trialStarted, setTrialStarted] = useState<boolean>(false);
+  const [trialUsed, setTrialUsed] = useState<boolean>(false);
+  const [trialExpired, setTrialExpired] = useState<boolean>(false);
+  const [licenseExpired, setLicenseExpired] = useState<boolean>(false);
+  const [trialDayNumber, setTrialDayNumber] = useState<number>(1);
+  const [trialDaysLeft, setTrialDaysLeft] = useState<number>(5);
+  const [trialHoursLeft, setTrialHoursLeft] = useState<number>(120);
+  const [activePlanType, setActivePlanType] = useState<'annual' | 'lifetime' | 'trial'>(() => {
+    try {
+      const stored = localStorage.getItem('fm_plan_type');
+      if (stored === 'annual' || stored === 'lifetime' || stored === 'trial') return stored;
+    } catch {}
+    return 'lifetime';
+  });
+  const [activeVariantName, setActiveVariantName] = useState<string>('Lifetime Access');
+  const [simulatedDayOverride, setSimulatedDayOverride] = useState<number | null>(null);
   const [licenseInput, setLicenseInput] = useState<string>('');
   const [licenseError, setLicenseError] = useState<boolean>(false);
   const [licenseAPIErrorText, setLicenseAPIErrorText] = useState<string>('');
@@ -1223,36 +1381,34 @@ export default function App() {
   const [draggedModeIdx, setDraggedModeIdx] = useState<number | null>(null);
   const [dragOverModeIdx, setDragOverModeIdx] = useState<number | null>(null);
   const [draggedOptionIdx, setDraggedOptionIdx] = useState<number | null>(null);
+  const [dragOverOptionIdx, setDragOverOptionIdx] = useState<number | null>(null);
 
   // Modular Modes Storage
   const [modes, setModes] = useState<Record<string, ModeDetail>>(() => {
     try {
-      const ver = localStorage.getItem('fm_state_ver');
-      if (ver === '5.0') {
-        const saved = localStorage.getItem('fm_modes');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
-            const mergedObj: Record<string, ModeDetail> = {};
-            Object.keys(parsed).forEach((k) => {
-              const def = DEFAULT_MODES[k];
-              const opts = Array.isArray(parsed[k]?.options) && parsed[k].options.length > 0 ? parsed[k].options : (def?.options || []);
-              const baseOpts = Array.isArray(parsed[k]?.baseOptions) && parsed[k].baseOptions.length > 0
-                ? parsed[k].baseOptions
-                : (def?.baseOptions || [...opts]);
+      const saved = localStorage.getItem('fm_modes');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+          const mergedObj: Record<string, ModeDetail> = {};
+          Object.keys(parsed).forEach((k) => {
+            const def = DEFAULT_MODES[k];
+            const opts = Array.isArray(parsed[k]?.options) ? parsed[k].options : (def?.options || []);
+            const baseOpts = Array.isArray(parsed[k]?.baseOptions) && parsed[k].baseOptions.length > 0
+              ? parsed[k].baseOptions
+              : (def?.baseOptions || [...opts]);
 
-              mergedObj[k] = {
-                title: parsed[k]?.title || def?.title || k,
-                accent: parsed[k]?.accent || def?.accent || 'rgba(30, 140, 255, 0.9)',
-                soft: parsed[k]?.soft || def?.soft || 'rgba(60, 170, 255, 0.18)',
-                defaultAccent: parsed[k]?.defaultAccent || def?.defaultAccent || 'rgba(30, 140, 255, 0.9)',
-                defaultSoft: parsed[k]?.defaultSoft || def?.defaultSoft || 'rgba(60, 170, 255, 0.18)',
-                options: opts,
-                baseOptions: baseOpts,
-              };
-            });
-            if (Object.keys(mergedObj).length > 0) return mergedObj;
-          }
+            mergedObj[k] = {
+              title: parsed[k]?.title || def?.title || k,
+              accent: parsed[k]?.accent || def?.accent || 'rgba(30, 140, 255, 0.9)',
+              soft: parsed[k]?.soft || def?.soft || 'rgba(60, 170, 255, 0.18)',
+              defaultAccent: parsed[k]?.defaultAccent || def?.defaultAccent || 'rgba(30, 140, 255, 0.9)',
+              defaultSoft: parsed[k]?.defaultSoft || def?.defaultSoft || 'rgba(60, 170, 255, 0.18)',
+              options: opts,
+              baseOptions: baseOpts,
+            };
+          });
+          if (Object.keys(mergedObj).length > 0) return mergedObj;
         }
       }
     } catch (e) {}
@@ -1262,30 +1418,43 @@ export default function App() {
   // Current selections for each mode
   const [selections, setSelections] = useState<Record<string, number[]>>(() => {
     const defaultSels: Record<string, number[]> = {};
-    Object.keys(DEFAULT_MODES).forEach((m) => {
-      try {
-        const savedS = localStorage.getItem('fm_sel_' + m);
-        if (savedS) {
-          defaultSels[m] = JSON.parse(savedS);
-        } else {
+    try {
+      const savedModesStr = localStorage.getItem('fm_modes');
+      let modeKeys = Object.keys(DEFAULT_MODES);
+      if (savedModesStr) {
+        try {
+          const parsed = JSON.parse(savedModesStr);
+          if (parsed && typeof parsed === 'object') {
+            modeKeys = Array.from(new Set([...modeKeys, ...Object.keys(parsed)]));
+          }
+        } catch (e) {}
+      }
+      modeKeys.forEach((m) => {
+        try {
+          const savedS = localStorage.getItem('fm_sel_' + m);
+          if (savedS) {
+            defaultSels[m] = JSON.parse(savedS);
+          } else {
+            defaultSels[m] = [];
+          }
+        } catch (e) {
           defaultSels[m] = [];
         }
-      } catch (e) {
+      });
+    } catch (e) {
+      Object.keys(DEFAULT_MODES).forEach((m) => {
         defaultSels[m] = [];
-      }
-    });
+      });
+    }
     return defaultSels;
   });
 
   // Mode customizer icons assignment
   const [iconAssignments, setIconAssignments] = useState<Record<string, string>>(() => {
     try {
-      const ver = localStorage.getItem('fm_state_ver');
-      if (ver === '5.0') {
-        const saved = localStorage.getItem('fm_icons');
-        if (saved) {
-          return JSON.parse(saved);
-        }
+      const saved = localStorage.getItem('fm_icons');
+      if (saved) {
+        return JSON.parse(saved);
       }
     } catch (e) {}
     return {
@@ -1308,6 +1477,34 @@ export default function App() {
     } catch (e) {}
     return {};
   });
+
+  const setFullModeIndexForCurrentMode = (newIdx: number) => {
+    const total = modes[currentMode]?.options.length || 0;
+    const clamped = Math.max(0, Math.min(total - 1, newIdx));
+    const nextObj = { ...fullModeIndices, [currentMode]: clamped };
+    setFullModeIndices(nextObj);
+    localStorage.setItem('fm_full_mode_indices', JSON.stringify(nextObj));
+  };
+
+  const currentFullIdx = Math.min(
+    Math.max(0, fullModeIndices[currentMode] || 0),
+    Math.max(0, (modes[currentMode]?.options.length || 1) - 1)
+  );
+
+  const handleFullModePrev = () => {
+    if (currentFullIdx > 0) {
+      setFullModeIndexForCurrentMode(currentFullIdx - 1);
+      playSoundChime('check');
+    }
+  };
+
+  const handleFullModeNext = () => {
+    const total = modes[currentMode]?.options.length || 0;
+    if (currentFullIdx < total - 1) {
+      setFullModeIndexForCurrentMode(currentFullIdx + 1);
+      playSoundChime('check');
+    }
+  };
 
   // Scale tracking (from localStorage)
   const [scale, setScale] = useState<number>(() => {
@@ -1379,6 +1576,8 @@ export default function App() {
   };
 
   // Auto Updater State
+  const [checkingUpdate, setCheckingUpdate] = useState<boolean>(false);
+  const [updateStatusText, setUpdateStatusText] = useState<string>('');
   const [updateAvailable, setUpdateAvailable] = useState<boolean>(false);
   const [updateVersion, setUpdateVersion] = useState<string>('');
   const [updateProgress, setUpdateProgress] = useState<number | null>(null);
@@ -1637,61 +1836,48 @@ export default function App() {
 
   // ── Sync states on load ──
   useEffect(() => {
-    // Clear stale old states if any config mismatch from legacy assets
-    const ver = localStorage.getItem('fm_state_ver');
-    if (ver !== '5.1') {
-      localStorage.removeItem('fm_modes');
-      localStorage.removeItem('fm_theme');
-      localStorage.removeItem('fm_scale');
-      localStorage.removeItem('fm_icons');
-      Object.keys(DEFAULT_MODES).forEach((m) => localStorage.removeItem('fm_sel_' + m));
-      localStorage.setItem('fm_state_ver', '5.1');
-      setModes(DEFAULT_MODES);
-      setSelections({
-        business: [],
-        life: [],
-        pc: [],
-        sync: [],
-        alerts: [],
-      });
-      setIconAssignments({
-        business: 'candlestick',
-        life: 'stop_loss',
-        pc: 'smart_money',
-        sync: 'instant_execution',
-        alerts: 'trade_journal',
-      });
-      setCurrentMode('business');
-    }
-
     // Determine stored Theme
     const isLightStored = localStorage.getItem('fm_theme') === '1';
     setIsLight(isLightStored);
 
-    // Initial check license trigger on Electron if available
+    // Evaluate 5-day persistent trial & license status
+    evaluateLicenseAndTrialStatus();
+
     if (window.electronAPI) {
       document.body.classList.add('electron');
-      window.electronAPI.checkLicense().then((res) => {
-        if (!res.ok) {
-          setLicenseActive(false);
-        } else {
-          setLicenseActive(true);
-        }
-      });
 
       // Hook up Electron automatic updater listeners
+      if (window.electronAPI.onCheckingForUpdate) {
+        window.electronAPI.onCheckingForUpdate(() => {
+          setCheckingUpdate(true);
+          setUpdateStatusText('Checking for updates...');
+        });
+      }
+
       if (window.electronAPI.onUpdateAvailable) {
         window.electronAPI.onUpdateAvailable((version) => {
+          setCheckingUpdate(false);
           setUpdateVersion(version);
           setUpdateAvailable(true);
           setUpdateDownloaded(false);
           setUpdateError(null);
+          setUpdateStatusText(`Update v${version} available!`);
+        });
+      }
+
+      if (window.electronAPI.onUpdateNotAvailable) {
+        window.electronAPI.onUpdateNotAvailable((version) => {
+          setCheckingUpdate(false);
+          setUpdateAvailable(false);
+          setUpdateStatusText(`You are on the latest version (v${version || '1.3.1'})`);
+          setTimeout(() => setUpdateStatusText(''), 5000);
         });
       }
 
       if (window.electronAPI.onDownloadProgress) {
         window.electronAPI.onDownloadProgress((percent) => {
           setUpdateProgress(percent);
+          setUpdateStatusText(`Downloading update... ${percent}%`);
         });
       }
 
@@ -1699,14 +1885,23 @@ export default function App() {
         window.electronAPI.onUpdateDownloaded(() => {
           setUpdateDownloaded(true);
           setUpdateProgress(100);
+          setUpdateStatusText('Update downloaded! Ready to install.');
         });
       }
 
       if (window.electronAPI.onUpdateError) {
         window.electronAPI.onUpdateError((err) => {
+          setCheckingUpdate(false);
           setUpdateError(err);
           setUpdateInstalling(false);
+          setUpdateStatusText(err || 'Update check failed.');
+          setTimeout(() => setUpdateStatusText(''), 6000);
         });
+      }
+
+      // Automatically trigger update check on app load
+      if (window.electronAPI.checkForUpdates) {
+        window.electronAPI.checkForUpdates();
       }
     }
   }, []);
@@ -1726,6 +1921,12 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('fm_modes', JSON.stringify(modes));
   }, [modes]);
+
+  useEffect(() => {
+    Object.keys(selections).forEach((m) => {
+      localStorage.setItem('fm_sel_' + m, JSON.stringify(selections[m] || []));
+    });
+  }, [selections]);
 
   useEffect(() => {
     localStorage.setItem('fm_theme', isLight ? '1' : '0');
@@ -1973,6 +2174,9 @@ export default function App() {
 
   const handleScaleChange = (val: number) => {
     setScale(val);
+    try {
+      localStorage.setItem('fm_scale', String(val));
+    } catch (e) {}
     if (window.electronAPI) {
       window.electronAPI.scaleStart();
       setTimeout(() => {
@@ -2017,9 +2221,197 @@ export default function App() {
     };
   }, [isGripped]);
 
-  // ── Gumroad License verification triggering ──
+  // ── 5-Day Persistent Trial Evaluator & Gumroad License Verification ──
+  const evaluateLicenseAndTrialStatus = async (simDayOverride?: number) => {
+    if (window.electronAPI) {
+      document.body.classList.add('electron');
+      const res = await window.electronAPI.checkLicense(simDayOverride);
+      if (res.licenseValid && res.isTrial === false) {
+        setLicenseActive(true);
+        setIsTrial(false);
+        setTrialExpired(false);
+        setLicenseExpired(false);
+        setActivePlanType(res.planType || 'lifetime');
+        setActiveVariantName(res.variantName || 'Lifetime Access');
+      } else if (res.licenseExpired) {
+        setLicenseActive(false);
+        setIsTrial(false);
+        setLicenseExpired(true);
+        setActivePlanType(res.planType || 'annual');
+        setLicenseAPIErrorText('Your license subscription has expired. Please enter a valid license key or purchase a new one at overdesk.store.');
+      } else {
+        // Trial evaluation
+        setIsTrial(true);
+        setTrialStarted(Boolean(res.trialStarted));
+        setTrialUsed(Boolean(res.trialUsed));
+
+        const dayNum = res.dayNumber || 1;
+        setTrialDayNumber(dayNum);
+        setTrialDaysLeft(res.daysLeft !== undefined ? res.daysLeft : 5);
+        setTrialHoursLeft(res.hoursLeft !== undefined ? res.hoursLeft : 120);
+
+        if (!res.trialStarted) {
+          // Default opening screen is License Page
+          setLicenseActive(false);
+          setTrialExpired(false);
+        } else if (res.trialExpired || dayNum >= 6) {
+          setTrialExpired(true);
+          setLicenseActive(false);
+        } else {
+          setTrialExpired(false);
+          setLicenseActive(true);
+        }
+      }
+    } else {
+      // Standard Web Browser Preview Fallback & Trial Engine
+      const isLicenseValid = localStorage.getItem('fm_license_valid') === '1';
+      const storedPlanType = (localStorage.getItem('fm_plan_type') as 'annual' | 'lifetime') || 'lifetime';
+      const storedVariant = localStorage.getItem('fm_variant_name') || 'Lifetime Access';
+      const expiresAtStr = localStorage.getItem('fm_license_expires_at');
+      const activatedAtStr = localStorage.getItem('fm_license_activated_at');
+
+      if (isLicenseValid) {
+        if (storedPlanType === 'lifetime' || storedVariant.toLowerCase().includes('lifetime')) {
+          setLicenseActive(true);
+          setIsTrial(false);
+          setTrialExpired(false);
+          setLicenseExpired(false);
+          setActivePlanType('lifetime');
+          setActiveVariantName(storedVariant);
+          return;
+        }
+
+        let expiresAt = expiresAtStr ? parseInt(expiresAtStr, 10) : 0;
+        if (!expiresAt && activatedAtStr) {
+          const activatedAt = parseInt(activatedAtStr, 10);
+          if (activatedAt > 0) {
+            expiresAt = activatedAt + (365 * 24 * 60 * 60 * 1000);
+          }
+        }
+
+        if (expiresAt > 0 && Date.now() >= expiresAt) {
+          const currentKey = localStorage.getItem('fm_license_key');
+          let expiredList: string[] = [];
+          try {
+            expiredList = JSON.parse(localStorage.getItem('fm_expired_keys') || '[]');
+          } catch (e) {}
+          if (currentKey) {
+            expiredList = Array.from(new Set([...expiredList, currentKey.trim().toUpperCase()]));
+            localStorage.setItem('fm_expired_keys', JSON.stringify(expiredList));
+          }
+          localStorage.setItem('fm_license_valid', '0');
+          localStorage.setItem('fm_license_active', '0');
+          setLicenseActive(false);
+          setIsTrial(false);
+          setLicenseExpired(true);
+          setActivePlanType(storedPlanType);
+          setLicenseAPIErrorText('Your license subscription has expired. Please enter a valid license key or purchase a new one at overdesk.store.');
+          return;
+        }
+
+        setLicenseActive(true);
+        setIsTrial(false);
+        setTrialExpired(false);
+        setLicenseExpired(false);
+        setActivePlanType(storedPlanType);
+        setActiveVariantName(storedVariant);
+        return;
+      }
+
+      const isStarted = localStorage.getItem('fm_trial_started') === '1';
+      const isUsed = localStorage.getItem('fm_trial_used') === '1' || isStarted;
+      setTrialStarted(isStarted);
+      setTrialUsed(isUsed);
+
+      if (!isStarted) {
+        setLicenseActive(false);
+        setTrialExpired(false);
+        return;
+      }
+
+      let startTime = parseInt(localStorage.getItem('fm_trial_start_time') || '0', 10);
+      if (!startTime || isNaN(startTime)) {
+        setLicenseActive(false);
+        return;
+      }
+
+      let now = Date.now();
+      if (typeof simDayOverride === 'number' && simDayOverride >= 1) {
+        now = startTime + (simDayOverride - 1) * 24 * 60 * 60 * 1000 + 1000;
+      }
+
+      const elapsedMs = Math.max(0, now - startTime);
+      const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
+      const isExpired = elapsedDays >= 5;
+
+      const dayNum = isExpired ? 6 : Math.min(5, Math.floor(elapsedDays) + 1);
+      const daysLeft = isExpired ? 0 : Math.max(0, Math.ceil(5 - elapsedDays));
+      const hoursLeft = isExpired ? 0 : Math.max(0, Math.ceil((5 * 24) - (elapsedMs / (1000 * 60 * 60))));
+
+      setIsTrial(true);
+      setTrialDayNumber(dayNum);
+      setTrialDaysLeft(daysLeft);
+      setTrialHoursLeft(hoursLeft);
+
+      if (isExpired) {
+        setTrialExpired(true);
+        setLicenseActive(false);
+        localStorage.setItem('fm_trial_used', '1');
+      } else {
+        setTrialExpired(false);
+        setLicenseActive(true);
+      }
+    }
+  };
+
   const handleLicenseInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setLicenseInput(e.target.value);
+  };
+
+  const handleStartTrial = async () => {
+    if (trialUsed || trialExpired) {
+      setLicenseError(true);
+      setLicenseAPIErrorText('Your free trial has already been used. Please purchase a license to continue.');
+      setTimeout(() => setLicenseError(false), 2500);
+      return;
+    }
+
+    setLicenseAPIErrorText('Starting 5-day free trial...');
+    if (window.electronAPI?.startTrial) {
+      const res = await window.electronAPI.startTrial();
+      if (res.ok) {
+        setLicenseActive(true);
+        setIsTrial(true);
+        setTrialStarted(true);
+        setTrialUsed(true);
+        setTrialExpired(false);
+        setTrialDayNumber(res.dayNumber || 1);
+        setTrialDaysLeft(res.daysLeft !== undefined ? res.daysLeft : 5);
+        setTrialHoursLeft(res.hoursLeft !== undefined ? res.hoursLeft : 120);
+        setLicenseAPIErrorText('');
+        playSoundChime('complete');
+      } else {
+        setLicenseError(true);
+        setTrialUsed(true);
+        setLicenseAPIErrorText(res.error || 'Your free trial has already been used. Please purchase a license to continue.');
+      }
+    } else {
+      const now = Date.now();
+      localStorage.setItem('fm_trial_started', '1');
+      localStorage.setItem('fm_trial_used', '1');
+      localStorage.setItem('fm_trial_start_time', now.toString());
+
+      setLicenseActive(true);
+      setIsTrial(true);
+      setTrialStarted(true);
+      setTrialUsed(true);
+      setTrialExpired(false);
+      setTrialDayNumber(1);
+      setTrialDaysLeft(5);
+      setTrialHoursLeft(120);
+      setLicenseAPIErrorText('');
+      playSoundChime('complete');
+    }
   };
 
   const attemptActivation = async () => {
@@ -2031,27 +2423,135 @@ export default function App() {
       return;
     }
 
+    // Check if key is stored as expired
+    let expiredKeys: string[] = [];
+    try {
+      expiredKeys = JSON.parse(localStorage.getItem('fm_expired_keys') || '[]');
+    } catch (e) {}
+
+    if (expiredKeys.includes(cleaned.toUpperCase())) {
+      setLicenseError(true);
+      setLicenseAPIErrorText('This license key has expired and cannot be reused. Please purchase a new license at overdesk.store.');
+      setTimeout(() => setLicenseError(false), 3000);
+      return;
+    }
+
     setLicenseAPIErrorText('Verifying license key with Gumroad API...');
     if (window.electronAPI) {
       const resp = await window.electronAPI.validateLicense(cleaned);
       if (resp.ok) {
+        if (resp.isTrial || resp.planType === 'trial') {
+          setLicenseActive(true);
+          setIsTrial(true);
+          setTrialStarted(true);
+          setTrialExpired(false);
+          setLicenseExpired(false);
+          setTrialDaysLeft(resp.daysRemaining || 5);
+          setActivePlanType('trial');
+          setActiveVariantName(resp.variantName || 'Trial Access');
+          setLicenseAPIErrorText('');
+          localStorage.setItem('fm_license_key', cleaned);
+          localStorage.setItem('fm_plan_type', 'trial');
+          localStorage.setItem('fm_trial_started', '1');
+          localStorage.setItem('fm_trial_start_time', Date.now().toString());
+          playSoundChime('complete');
+          return;
+        }
+
         setLicenseActive(true);
+        setIsTrial(false);
+        setTrialExpired(false);
+        setLicenseExpired(false);
+        const plan = resp.planType || (cleaned.toUpperCase().includes('ANNUAL') ? 'annual' : 'lifetime');
+        const variant = resp.variantName || (plan === 'annual' ? 'Annual Subscription (1 Year)' : 'Lifetime Access');
+        setActivePlanType(plan);
+        setActiveVariantName(variant);
         setLicenseAPIErrorText('');
+        localStorage.setItem('fm_license_key', cleaned);
+        localStorage.setItem('fm_plan_type', plan);
+        playSoundChime('complete');
       } else {
         setLicenseError(true);
         const err = resp.error || '';
-        if (err.includes('refunded')) {
+        if (err.includes('expired') || err.includes('cannot be reused')) {
+          setLicenseAPIErrorText(err || 'This license key has expired and cannot be reused.');
+          try {
+            const updated = Array.from(new Set([...expiredKeys, cleaned.toUpperCase()]));
+            localStorage.setItem('fm_expired_keys', JSON.stringify(updated));
+          } catch (e) {}
+        } else if (err.includes('refunded')) {
           setLicenseAPIErrorText('This license has been refunded and is no longer valid.');
         } else if (err.includes('already activated') || err.includes('another device')) {
           setLicenseAPIErrorText('This license key is already activated on another device. Contact support to transfer.');
+        } else if (err.includes('trial license key has already been used') || err.includes('trial has already been used')) {
+          setLicenseAPIErrorText('Your free trial has already been used. Please purchase a license to continue.');
         } else {
-          setLicenseAPIErrorText('Invalid Key, get key from Gumroad');
+          setLicenseAPIErrorText(resp.error || 'Invalid Key, get key from Gumroad');
         }
       }
     } else {
       // Fallback bypass mode on standard web preview
+      const upperKey = cleaned.toUpperCase();
+      const isAnnual = upperKey.includes('ANNUAL') || upperKey.includes('YEAR');
+      const isLifetime = upperKey.includes('LIFETIME') || upperKey.includes('PRO-LIFETIME');
+      const isTrialKey = !isAnnual && !isLifetime;
+
+      if (isTrialKey) {
+        const isStarted = localStorage.getItem('fm_trial_started') === '1';
+        const isUsed = localStorage.getItem('fm_trial_used') === '1' || isStarted;
+        let expiredKeysList: string[] = [];
+        try {
+          expiredKeysList = JSON.parse(localStorage.getItem('fm_expired_keys') || '[]');
+        } catch (e) {}
+
+        if (isUsed || expiredKeysList.includes(upperKey)) {
+          setLicenseError(true);
+          setLicenseAPIErrorText('This trial license key has expired. Please purchase an Annual or Lifetime license at overdesk.store.');
+          setTimeout(() => setLicenseError(false), 3000);
+          return;
+        }
+
+        const now = Date.now();
+        localStorage.setItem('fm_trial_started', '1');
+        localStorage.setItem('fm_trial_used', '1');
+        localStorage.setItem('fm_trial_start_time', now.toString());
+        localStorage.setItem('fm_plan_type', 'trial');
+        localStorage.setItem('fm_license_key', cleaned);
+        setLicenseActive(true);
+        setIsTrial(true);
+        setTrialStarted(true);
+        setTrialExpired(false);
+        setTrialDaysLeft(5);
+        setActivePlanType('trial');
+        setActiveVariantName('5-Day Trial Access');
+        playSoundChime('complete');
+        return;
+      }
+
+      const plan = isAnnual ? 'annual' : 'lifetime';
+      const variant = isAnnual ? 'Annual Subscription (1 Year)' : 'Lifetime Access';
+      const now = Date.now();
+      const expiresAt = isAnnual ? now + (365 * 24 * 60 * 60 * 1000) : null;
+
+      localStorage.setItem('fm_license_valid', '1');
+      localStorage.setItem('fm_license_key', cleaned);
+      localStorage.setItem('fm_plan_type', plan);
+      localStorage.setItem('fm_variant_name', variant);
+      localStorage.setItem('fm_license_activated_at', now.toString());
+      if (expiresAt) {
+        localStorage.setItem('fm_license_expires_at', expiresAt.toString());
+      } else {
+        localStorage.removeItem('fm_license_expires_at');
+      }
+
       setLicenseActive(true);
+      setIsTrial(false);
+      setTrialExpired(false);
+      setLicenseExpired(false);
+      setActivePlanType(plan);
+      setActiveVariantName(variant);
       setLicenseAPIErrorText('');
+      playSoundChime('complete');
     }
   };
 
@@ -2060,6 +2560,13 @@ export default function App() {
     setEditingTitle(false);
     setEditingItemIdx(null);
     setCurrentMode(mode);
+    if (fullMode) {
+      setFullModeIndices((prev) => {
+        const next = { ...prev, [mode]: prev[mode] ?? 0 };
+        localStorage.setItem('fm_full_mode_indices', JSON.stringify(next));
+        return next;
+      });
+    }
     if (editMode) {
       // Toggle mode visual configuration overlay
       setPickerTargetMode(mode);
@@ -2174,6 +2681,8 @@ export default function App() {
       });
 
       setSelections(emptyChecklists);
+      setFullModeIndices({});
+      localStorage.removeItem('fm_full_mode_indices');
       setModes(resetModes);
       localStorage.setItem('fm_modes', JSON.stringify(resetModes));
       localStorage.setItem('fm_state_ver', '5.0');
@@ -2182,6 +2691,13 @@ export default function App() {
       const nextSelections = { ...selections, [currentMode]: [] };
       setSelections(nextSelections);
       localStorage.setItem('fm_sel_' + currentMode, JSON.stringify([]));
+
+      setFullModeIndices((prev) => {
+        const next = { ...prev };
+        delete next[currentMode];
+        localStorage.setItem('fm_full_mode_indices', JSON.stringify(next));
+        return next;
+      });
 
       const base = modes[currentMode]?.baseOptions || DEFAULT_MODES[currentMode]?.options || modes[currentMode]?.options || [];
       const updatedModes = {
@@ -2279,22 +2795,35 @@ export default function App() {
 
     setSelections((prev) => ({ ...prev, [currentMode]: reassignedChecked }));
     localStorage.setItem('fm_sel_' + currentMode, JSON.stringify(reassignedChecked));
+
+    if (fullModeIndices[currentMode] !== undefined) {
+      const maxIdx = Math.max(0, updatedOptions.length - 1);
+      const currIdx = fullModeIndices[currentMode] || 0;
+      if (currIdx > maxIdx) {
+        setFullModeIndexForCurrentMode(maxIdx);
+      }
+    }
   };
 
   // ── Add dynamic item option checklist ──
   const addNewItemOption = () => {
-    const listCopy = [...modes[currentMode].options, 'New option'];
-    const baseCopy = [...(modes[currentMode].baseOptions || modes[currentMode].options), 'New option'];
-    setModes((prev) => ({
-      ...prev,
+    const listCopy = [...(modes[currentMode]?.options || []), 'New option'];
+    const baseCopy = [...(modes[currentMode]?.baseOptions || modes[currentMode]?.options || []), 'New option'];
+    const updatedModes = {
+      ...modes,
       [currentMode]: {
-        ...prev[currentMode],
+        ...modes[currentMode],
         options: listCopy,
         baseOptions: baseCopy,
       },
-    }));
+    };
+    setModes(updatedModes);
+    localStorage.setItem('fm_modes', JSON.stringify(updatedModes));
 
     const nextIdx = listCopy.length - 1;
+    if (fullMode) {
+      setFullModeIndexForCurrentMode(nextIdx);
+    }
     setEditingItemIdx(nextIdx);
     setEditingItemValue('New option');
     setTimeout(() => {
@@ -2557,11 +3086,62 @@ export default function App() {
     }
   };
 
+  // ── Mode Progress Helper: calculates accurate progress for both active and background modes ──
+  const getModeProgress = (modeKey: string) => {
+    const totalOptions = modes[modeKey]?.options.length || 0;
+    if (totalOptions === 0) {
+      return { checkedCount: 0, totalCount: 0, pct: 0, hasLiquidFill: false };
+    }
+
+    if (fullMode) {
+      // In Full Mode:
+      if (modeKey === currentMode) {
+        const fullIdx = currentFullIdx;
+        const checkedCount = fullIdx + 1;
+        const pct = Math.min(1, Math.max(0, checkedCount / totalOptions));
+        return { checkedCount, totalCount: totalOptions, pct, hasLiquidFill: true };
+      }
+
+      // Other mode in Full Mode:
+      if (fullModeIndices[modeKey] !== undefined) {
+        const fullIdx = Math.min(Math.max(0, fullModeIndices[modeKey]), totalOptions - 1);
+        const checkedCount = fullIdx + 1;
+        const pct = Math.min(1, Math.max(0, checkedCount / totalOptions));
+        return { checkedCount, totalCount: totalOptions, pct, hasLiquidFill: true };
+      }
+
+      // If other mode has checked items from checklist mode:
+      const selCount = selections[modeKey]?.length || 0;
+      if (selCount > 0) {
+        const pct = Math.min(1, Math.max(0, selCount / totalOptions));
+        return { checkedCount: selCount, totalCount: totalOptions, pct, hasLiquidFill: true };
+      }
+
+      return { checkedCount: 0, totalCount: totalOptions, pct: 0, hasLiquidFill: false };
+    } else {
+      // In Checklist Mode:
+      const selCount = selections[modeKey]?.length || 0;
+      if (selCount > 0) {
+        const pct = Math.min(1, Math.max(0, selCount / totalOptions));
+        return { checkedCount: selCount, totalCount: totalOptions, pct, hasLiquidFill: true };
+      }
+
+      // If other mode was begun in Full Mode:
+      if (fullModeIndices[modeKey] !== undefined && fullModeIndices[modeKey] > 0) {
+        const fullIdx = Math.min(Math.max(0, fullModeIndices[modeKey]), totalOptions - 1);
+        const checkedCount = fullIdx + 1;
+        const pct = Math.min(1, Math.max(0, checkedCount / totalOptions));
+        return { checkedCount, totalCount: totalOptions, pct, hasLiquidFill: true };
+      }
+
+      return { checkedCount: 0, totalCount: totalOptions, pct: 0, hasLiquidFill: false };
+    }
+  };
+
   // ── Render Helpers: Liquid Wave Path Calculation ──
   const compileLiquidWaveData = (modeKey: string) => {
-    const totalOptions = modes[modeKey]?.options.length || 0;
-    const checkedOptions = selections[modeKey]?.length || 0;
-    const pct = totalOptions > 0 ? checkedOptions / totalOptions : 0;
+    const progress = getModeProgress(modeKey);
+    const pct = progress.pct;
 
     const accentRaw = modes[modeKey]?.accent || 'rgba(110,0,210,0.9)';
     const m = accentRaw.match(/[\d.]+/g) || ['110', '0', '210'];
@@ -2591,6 +3171,7 @@ export default function App() {
 
     return {
       pct,
+      hasLiquidFill: progress.hasLiquidFill,
       baseColor,
       gradientHigh,
       waterY,
@@ -2621,14 +3202,17 @@ export default function App() {
     >
       {/* Main checklist canvas card widget */}
       <div
-        className={`card ${isLight ? 'light' : ''} ${minimized ? 'minimized' : ''} ${isGripped ? 'gripped' : ''} ${!licenseActive ? 'license-mode' : ''}`}
+        className={`card ${isLight ? 'light' : ''} ${minimized ? 'minimized' : ''} ${isEyeMode ? 'eye-mode' : ''} ${isGripped ? 'gripped' : ''} ${!licenseActive ? 'license-mode' : ''}`}
         id="card"
         ref={cardRef}
         onPointerDown={handleCardPointerDown}
         onPointerMove={handleCardPointerMove}
         onPointerUp={handleCardPointerUp}
         onPointerCancel={handleCardPointerUp}
-        onDragStart={(e) => e.preventDefault()}
+        onDragStart={(e) => {
+          if ((e.target as HTMLElement).closest('.option, .mode-drag-handle, [draggable="true"]')) return;
+          e.preventDefault();
+        }}
         style={{
           transform: `translate(${translate.x}px, ${translate.y}px) scale(${isGripped ? 1.035 : 1})`,
           boxShadow: !licenseActive ? 'none' : (isGripped ? `0 20px 50px -5px ${modes[currentMode]?.soft || 'var(--accent-soft)'}, 0 8px 24px -2px rgba(0, 0, 0, 0.45)` : undefined),
@@ -2700,16 +3284,66 @@ export default function App() {
             <img 
               className="license-logo" 
               src={overdeskLogo} 
-              alt="Overdesk Checklist Logo" 
-              style={{ width: '88px', height: '88px', objectFit: 'contain', marginBottom: '2px' }}
+              alt="Overdesk Nexus Logo" 
+              style={{ width: '115px', height: '115px', objectFit: 'contain', marginBottom: '2px' }}
               referrerPolicy="no-referrer"
             />
-            <div className="license-title">Overdesk Checklist 2.0</div>
-            <div className="license-sub">
-              Enter your license key to activate.
-              <br />
-              Find your license key inside your Gumroad purchase receipt.
+            {trialExpired || trialUsed ? (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.16)',
+                border: '1px solid rgba(239, 68, 68, 0.35)',
+                color: '#f87171',
+                padding: '3px 10px',
+                borderRadius: '999px',
+                fontSize: '10px',
+                fontWeight: '800',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                marginBottom: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}>
+                🔒 FREE TRIAL ALREADY USED
+              </div>
+            ) : licenseExpired ? (
+              <div style={{
+                background: 'rgba(245, 158, 11, 0.16)',
+                border: '1px solid rgba(245, 158, 11, 0.35)',
+                color: '#fbbf24',
+                padding: '3px 10px',
+                borderRadius: '999px',
+                fontSize: '10px',
+                fontWeight: '800',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                marginBottom: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}>
+                ⏰ LICENSE SUBSCRIPTION EXPIRED
+              </div>
+            ) : null}
+
+            <div className="license-title">Overdesk Nexus</div>
+
+            <div className="license-sub" style={{ textAlign: 'center', maxWidth: '290px', margin: '0 auto 6px', lineHeight: '1.45' }}>
+              {trialExpired || trialUsed ? (
+                <span style={{ color: '#f87171', fontWeight: 700 }}>
+                  Your free trial has already been used. Please purchase a license to continue.
+                </span>
+              ) : licenseExpired ? (
+                <span style={{ color: '#fbbf24', fontWeight: 700 }}>
+                  Your annual subscription has expired. Please enter a valid license key or purchase a renewal.
+                </span>
+              ) : (
+                <>
+                  Activate your license key or start a 5-day free trial.
+                </>
+              )}
             </div>
+
             <input
               className={`license-input ${licenseError ? 'error' : ''}`}
               id="license-input"
@@ -2722,6 +3356,7 @@ export default function App() {
                 if (e.key === 'Enter') attemptActivation();
               }}
             />
+
             {licenseAPIErrorText && (
               <div 
                 className="license-api-feedback"
@@ -2740,14 +3375,40 @@ export default function App() {
                 {licenseAPIErrorText}
               </div>
             )}
+
             <button className="license-btn" onClick={attemptActivation}>
-              Activate
+              {trialExpired || trialUsed || licenseExpired ? 'Unlock Access with Key' : 'Activate License'}
             </button>
+
+            {!trialUsed && !trialExpired && !licenseExpired && (
+              <div style={{ width: '100%', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+                <div style={{ fontSize: '10px', color: isLight ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 'bold' }}>— OR —</div>
+                <button 
+                  className="license-btn trial-btn" 
+                  onClick={handleStartTrial}
+                >
+                  Start 5-Day Free Trial
+                </button>
+              </div>
+            )}
             
-            <div className="license-hint">
-              <span>
-                Get your license key on Gumroad: <a href="https://overdesk.gumroad.com/l/app3" target="_blank" rel="noreferrer">overdesk.gumroad.com/l/app3</a>
-              </span>
+            <div className="license-hint" style={{ marginTop: '10px' }}>
+              <a 
+                href="https://overdesk.store" 
+                target="_blank" 
+                rel="noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  color: '#38bdf8',
+                  fontWeight: '700',
+                  textDecoration: 'none',
+                  fontSize: '12px'
+                }}
+              >
+                🛒 Purchase License at overdesk.store →
+              </a>
             </div>
           </div>
         ) : (
@@ -2785,42 +3446,102 @@ export default function App() {
 
         {/* Top Header Controls row */}
         <div className="top-bar" id="top-bar">
-          {/* Left Theme toggle button */}
-          <div
-            className="theme-switch"
-            id="theme-switch"
-            onClick={() => {
-              setIsLight(!isLight);
-              localStorage.setItem('fm_theme', !isLight ? '1' : '0');
-            }}
-          >
+          {/* Left Theme & Eye Mode Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {/* Left Theme toggle button */}
             <div
-              className="theme-switch-knob"
-              id="theme-knob"
+              className="theme-switch"
+              id="theme-switch"
+              onClick={() => {
+                setIsLight(!isLight);
+                localStorage.setItem('fm_theme', !isLight ? '1' : '0');
+              }}
+              title={isLight ? "Switch to Dark Mode" : "Switch to Light Mode"}
+            >
+              <div
+                className="theme-switch-knob"
+                id="theme-knob"
+                style={{
+                  transform: isLight ? 'translateX(18px)' : 'translateX(0px)',
+                }}
+              >
+                {isLight ? (
+                  // Moon Icon
+                  <svg id="theme-icon" viewBox="0 0 24 24">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                  </svg>
+                ) : (
+                  // Sun Icon
+                  <svg id="theme-icon" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="5" />
+                    <line x1="12" y1="1" x2="12" y2="3" />
+                    <line x1="12" y1="21" x2="12" y2="23" />
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                    <line x1="1" y1="12" x2="3" y2="12" />
+                    <line x1="21" y1="12" x2="23" y2="12" />
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                  </svg>
+                )}
+              </div>
+            </div>
+
+            {/* Eye Mode toggle button */}
+            <button
+              className={`eye-mode-toggle ${isEyeMode ? 'on' : ''}`}
+              id="eye-mode-toggle"
+              onClick={() => {
+                const next = !isEyeMode;
+                setIsEyeMode(next);
+                localStorage.setItem('fm_eye_mode', next ? '1' : '0');
+              }}
+              title={isEyeMode ? "Exit Eye Mode (Restore Card Container)" : "Eye Mode (Containerless / Pure Floating Checklist)"}
               style={{
-                transform: isLight ? 'translateX(18px)' : 'translateX(0px)',
+                background: isEyeMode 
+                  ? (isLight ? 'rgba(2, 132, 199, 0.16)' : 'rgba(56, 189, 248, 0.22)') 
+                  : (isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.08)'),
+                border: isEyeMode
+                  ? `1px solid ${isLight ? 'rgba(2, 132, 199, 0.45)' : 'rgba(56, 189, 248, 0.5)'}`
+                  : `1px solid ${isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.12)'}`,
+                borderRadius: '50%',
+                width: '26px',
+                height: '26px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: isEyeMode 
+                  ? (isLight ? '#0284c7' : '#38bdf8') 
+                  : (isLight ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.65)'),
+                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                padding: 0,
+                margin: 0,
+                boxShadow: 'none',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.1)';
+                e.currentTarget.style.color = isLight ? '#0284c7' : '#38bdf8';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.color = isEyeMode 
+                  ? (isLight ? '#0284c7' : '#38bdf8') 
+                  : (isLight ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.65)');
               }}
             >
-              {isLight ? (
-                // Moon Icon
-                <svg id="theme-icon" viewBox="0 0 24 24">
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              {isEyeMode ? (
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                  <circle cx="12" cy="12" r="3.5" fill="currentColor" />
                 </svg>
               ) : (
-                // Sun Icon
-                <svg id="theme-icon" viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="5" />
-                  <line x1="12" y1="1" x2="12" y2="3" />
-                  <line x1="12" y1="21" x2="12" y2="23" />
-                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                  <line x1="1" y1="12" x2="3" y2="12" />
-                  <line x1="21" y1="12" x2="23" y2="12" />
-                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                  <circle cx="12" cy="12" r="3" />
                 </svg>
               )}
-            </div>
+            </button>
           </div>
 
           {/* Center Minimize Pill */}
@@ -3034,19 +3755,21 @@ export default function App() {
                 justifyContent: 'center',
                 gap: '8px',
                 alignItems: 'center',
-                marginBottom: '16px',
+                marginTop: 0,
+                marginLeft: 0,
+                marginRight: 0,
+                marginBottom: isEyeMode ? '10px' : '16px',
                 flexShrink: 0,
                 width: '100%',
                 position: 'relative',
                 zIndex: 5,
                 padding: 0,
-                margin: 0,
               }}
             >
               {Object.keys(modes).map((mKey, mIdx) => {
-                const hasLiquidFill = selections[mKey]?.length > 0;
-                const isSelected = mKey === currentMode;
                 const waveParams = compileLiquidWaveData(mKey);
+                const hasLiquidFill = waveParams.hasLiquidFill;
+                const isSelected = mKey === currentMode;
                 const modeAccent = modes[mKey]?.accent || 'var(--accent)';
 
                 let translateX = 0;
@@ -3130,10 +3853,13 @@ export default function App() {
                       style={{
                         borderRadius: '50%',
                         transform: 'scale(1.0)',
-                        transition: 'box-shadow 0.25s ease, transform 0.25s ease',
-                        boxShadow: isSelected 
-                          ? `0 0 0 2px ${modeAccent}` 
-                          : '0 0 0 0px transparent',
+                        transition: 'box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease',
+                        boxShadow: isEyeMode
+                          ? 'none'
+                          : (isSelected ? `0 0 0 2px ${modeAccent}` : '0 0 0 0px transparent'),
+                        border: isEyeMode
+                          ? (isSelected ? `2px solid ${modeAccent}` : '2px solid transparent')
+                          : undefined,
                         position: 'relative',
                       }}
                     >
@@ -3383,6 +4109,23 @@ export default function App() {
               onMouseDown={(e) => e.stopPropagation()}
               style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '6px 4px 16px', flex: 1, minHeight: 0 }}
             >
+              {/* License Status Section (Always shown at top of settings) */}
+              <div className="setting-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--divider)', paddingBottom: '10px' }}>
+                <span className="setting-label" style={{ fontSize: '9.5px', color: isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 'bold', textAlign: 'left' }}>
+                  License Status
+                </span>
+                {isTrial || activePlanType === 'trial' ? (
+                  <span style={{ fontSize: '9.5px', fontWeight: '700', color: '#fbbf24', background: 'rgba(251, 191, 36, 0.14)', padding: '2px 8px', borderRadius: '999px', border: '1px solid rgba(251, 191, 36, 0.35)', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                    <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#fbbf24', display: 'inline-block' }} />
+                    5-DAY TRIAL ({trialDaysLeft}D LEFT)
+                  </span>
+                ) : (
+                  <span style={{ fontSize: '9.5px', fontWeight: '700', color: activePlanType === 'annual' ? '#38bdf8' : '#00e676', background: activePlanType === 'annual' ? 'rgba(56,189,248,0.14)' : 'rgba(0,230,118,0.14)', padding: '2px 8px', borderRadius: '999px', border: activePlanType === 'annual' ? '1px solid rgba(56,189,248,0.35)' : '1px solid rgba(0,230,118,0.3)', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                    <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: activePlanType === 'annual' ? '#38bdf8' : '#00e676', display: 'inline-block' }} />
+                    {activePlanType === 'annual' ? 'ANNUAL PLAN' : 'LIFETIME UNLOCKED'}
+                  </span>
+                )}
+              </div>
               <div className="setting-section" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <span className="setting-label" style={{ fontSize: '9.5px', color: isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 'bold', textAlign: 'left' }}>Window Scale</span>
                 <GooeyNav
@@ -3391,10 +4134,25 @@ export default function App() {
                     { label: 'x1.5', onClick: () => handleScaleChange(1.5) },
                     { label: 'x1.2', onClick: () => handleScaleChange(1.2) },
                     { label: 'x1', onClick: () => handleScaleChange(1) },
+                    { label: 'x0.9', onClick: () => handleScaleChange(0.9) },
+                    { label: 'x0.8', onClick: () => handleScaleChange(0.8) },
                     { label: 'x0.7', onClick: () => handleScaleChange(0.7) },
-                    { label: 'x0.5', onClick: () => handleScaleChange(0.5) },
                   ]}
-                  activeIndex={[2, 1.5, 1.2, 1, 0.7, 0.5].findIndex((v) => Math.abs(scale - v) < 0.01)}
+                  activeIndex={[2, 1.5, 1.2, 1, 0.9, 0.8, 0.7].findIndex((v) => Math.abs(scale - v) < 0.01)}
+                  particleCount={12}
+                  animationTime={450}
+                />
+              </div>
+
+              {/* Display Mode Setting: Checklist vs Full Mode */}
+              <div className="setting-section" style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--divider)', paddingTop: '10px' }}>
+                <span className="setting-label" style={{ fontSize: '9.5px', color: isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 'bold', textAlign: 'left' }}>Display Mode</span>
+                <GooeyNav
+                  items={[
+                    { label: 'Checklist', onClick: () => handleFullModeChange(false) },
+                    { label: 'Full Mode', onClick: () => handleFullModeChange(true) },
+                  ]}
+                  activeIndex={fullMode ? 1 : 0}
                   particleCount={12}
                   animationTime={450}
                 />
@@ -3447,6 +4205,19 @@ export default function App() {
                     { label: 'Disabled', onClick: () => handleMoveCheckedToBottomChange(false) },
                   ]}
                   activeIndex={moveCheckedToBottom ? 0 : 1}
+                  particleCount={12}
+                  animationTime={450}
+                />
+              </div>
+
+              <div className="setting-section" style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--divider)', paddingTop: '10px' }}>
+                <span className="setting-label" style={{ fontSize: '9.5px', color: isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 'bold', textAlign: 'left' }}>Auto-reset Daily</span>
+                <GooeyNav
+                  items={[
+                    { label: 'Enabled', onClick: () => handleAutoResetDailyChange(true) },
+                    { label: 'Disabled', onClick: () => handleAutoResetDailyChange(false) },
+                  ]}
+                  activeIndex={autoResetDaily ? 0 : 1}
                   particleCount={12}
                   animationTime={450}
                 />
@@ -3851,6 +4622,69 @@ export default function App() {
                   {resetConfirming ? '⚠️ Click again or Double-Click to Reset' : 'Double-Click to Reset App'}
                 </button>
               </div>
+
+              {/* Software Update Section */}
+              <div className="setting-section" style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--divider)', paddingTop: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span className="setting-label" style={{ fontSize: '9.5px', color: isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 'bold', textAlign: 'left' }}>
+                    Software Update
+                  </span>
+                  <span style={{ fontSize: '9.5px', fontWeight: '700', color: isLight ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.65)' }}>
+                    v1.3.4
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => {
+                    if (window.electronAPI?.checkForUpdates) {
+                      setCheckingUpdate(true);
+                      setUpdateStatusText('Checking for updates...');
+                      window.electronAPI.checkForUpdates();
+                    } else {
+                      setCheckingUpdate(true);
+                      setUpdateStatusText('Checking for updates...');
+                      setTimeout(() => {
+                        setCheckingUpdate(false);
+                        setUpdateStatusText('You are running the latest version (v1.3.4)');
+                        setTimeout(() => setUpdateStatusText(''), 4000);
+                      }, 1000);
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '7px 12px',
+                    borderRadius: '10px',
+                    background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.08)',
+                    border: '1px solid ' + (isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.15)'),
+                    color: isLight ? '#0f172a' : '#ffffff',
+                    fontWeight: '600',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                  }}
+                  title="Check GitHub Releases for app updates"
+                >
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: checkingUpdate ? 'spin 1s linear infinite' : 'none' }}>
+                    <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+                  </svg>
+                  {checkingUpdate ? 'Checking for Updates...' : 'Check for Updates'}
+                </button>
+
+                {updateStatusText && (
+                  <div style={{ fontSize: '9.5px', fontWeight: '600', textAlign: 'center', color: updateError ? '#ff5252' : (updateAvailable ? '#00e676' : (isLight ? '#0284c7' : '#38bdf8')), padding: '2px 4px' }}>
+                    {updateStatusText}
+                  </div>
+                )}
+              </div>
+
+              {/* Version Footer */}
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid var(--divider)', opacity: 0.5, fontSize: '9px', fontWeight: '600', color: isLight ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.6)' }}>
+                Overdesk Nexus v1.3.4
+              </div>
             </div>
           </div>
         )}
@@ -4234,7 +5068,7 @@ export default function App() {
             )
           )}
         </div>
-        <div className="title-wrap">
+        <div className="title-wrap" style={fullMode ? { justifyContent: 'center', textAlign: 'center' } : undefined}>
           {editingTitle ? (
             <input
               ref={titleInputRef}
@@ -4244,11 +5078,12 @@ export default function App() {
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
-                fontSize: titleInputValue.length > 22 ? '18px' : titleInputValue.length > 15 ? '21px' : '25px',
+                fontSize: '24px',
                 width: '100%',
                 flex: 1,
                 minWidth: 0,
                 boxSizing: 'border-box',
+                textAlign: fullMode ? 'center' : 'left',
               }}
               type="text"
               value={titleInputValue}
@@ -4259,10 +5094,21 @@ export default function App() {
               }}
             />
           ) : (
-            <div className={`title-container-editable ${editMode ? 'can-edit' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, overflow: 'hidden' }}>
+            <div
+              className={`title-container-editable ${editMode ? 'can-edit' : ''}`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: fullMode ? 'center' : 'flex-start',
+                gap: '6px',
+                flex: fullMode ? '0 1 100%' : 1,
+                minWidth: 0,
+                overflow: 'hidden',
+                textAlign: fullMode ? 'center' : 'left',
+              }}
+            >
               {(() => {
                 const titleStr = modes[currentMode]?.title || 'Precision';
-                const dynamicFontSize = titleStr.length > 22 ? '18px' : titleStr.length > 15 ? '21px' : '25px';
                 return (
                   <h1
                     className={`title ${editMode ? 'editable' : ''}`}
@@ -4282,12 +5128,13 @@ export default function App() {
                       lineHeight: '1.2',
                       paddingBottom: '2px',
                       display: 'block',
-                      fontSize: dynamicFontSize,
-                      flex: 1,
+                      fontSize: '24px',
+                      flex: fullMode ? '0 1 auto' : 1,
                       minWidth: 0,
+                      textAlign: fullMode ? 'center' : 'left',
                     }}
                   >
-                    {titleStr}
+                    {renderFormattedMarkdown(titleStr, 800)}
                   </h1>
                 );
               })()}
@@ -4324,9 +5171,11 @@ export default function App() {
               )}
             </div>
           )}
-          <span className="mode-counter" id="mode-counter">
-            {totalModeChecked}/{totalModeOptions}
-          </span>
+          {!fullMode && (
+            <span className="mode-counter" id="mode-counter">
+              {`${totalModeChecked}/${totalModeOptions}`}
+            </span>
+          )}
         </div>
 
         <div className="divider"></div>
@@ -4335,6 +5184,327 @@ export default function App() {
         <div className="card-body">
           {(() => {
             const activeScrollAreaHeight = 176 + expandedExtraHeight;
+
+            if (fullMode) {
+              const currentItemText = modes[currentMode]?.options[currentFullIdx] || '';
+              const isMultiLine = currentItemText.includes('\n') || currentItemText.length > 35;
+              const dynamicFullFontSize = isMultiLine ? '26px' : '34px';
+
+              const handleFullModeTextChange = (newVal: string) => {
+                const listCopy = [...(modes[currentMode]?.options || [])];
+                listCopy[currentFullIdx] = newVal;
+
+                const baseCopy = [...(modes[currentMode]?.baseOptions || modes[currentMode]?.options || [])];
+                if (baseCopy[currentFullIdx] !== undefined) {
+                  baseCopy[currentFullIdx] = newVal;
+                }
+
+                const updatedModes = {
+                  ...modes,
+                  [currentMode]: {
+                    ...modes[currentMode],
+                    options: listCopy,
+                    baseOptions: baseCopy,
+                  },
+                };
+                setModes(updatedModes);
+                localStorage.setItem('fm_modes', JSON.stringify(updatedModes));
+              };
+
+              return (
+                <div
+                  className="full-mode-wrapper"
+                  style={{
+                    height: `${activeScrollAreaHeight}px`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '6px',
+                    position: 'relative',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '0',
+                  }}
+                >
+                  {/* Text area without container frame */}
+                  <div
+                    className="full-mode-card"
+                    style={{
+                      flex: 1,
+                      minHeight: 0,
+                      width: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      padding: 0,
+                      background: 'transparent',
+                      border: 'none',
+                      boxShadow: 'none',
+                      backdropFilter: 'none',
+                      WebkitBackdropFilter: 'none',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    {totalModeOptions === 0 ? (
+                      <div style={{ opacity: 0.5, fontSize: '16px', fontStyle: 'italic', margin: 'auto' }}>
+                        No items in this mode
+                      </div>
+                    ) : editMode ? (
+                      /* DIRECT INLINE EDITING IN EDIT MODE */
+                      <div
+                        style={{
+                          width: '100%',
+                          flex: 1,
+                          minHeight: 0,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          boxSizing: 'border-box',
+                          padding: '4px 0',
+                        }}
+                      >
+                        <textarea
+                          ref={listInputRef as any}
+                          className="full-mode-textarea"
+                          value={currentItemText}
+                          onChange={(e) => handleFullModeTextChange(e.target.value)}
+                          onKeyDown={(e) => {
+                            e.stopPropagation();
+                            if (e.key === 'Escape') {
+                              (e.target as HTMLElement).blur();
+                            }
+                          }}
+                          placeholder="Type item text..."
+                          style={{
+                            width: '100%',
+                            flex: 1,
+                            minHeight: '80px',
+                            maxHeight: '140px',
+                            fontSize: dynamicFullFontSize,
+                            fontFamily: "'Google Sans', 'Google Sans Flex', 'Product Sans', 'Plus Jakarta Sans', 'Open Sans', sans-serif",
+                            fontWeight: 800,
+                            lineHeight: 1.25,
+                            letterSpacing: '-0.025em',
+                            borderRadius: '12px',
+                            padding: '8px 10px',
+                            background: isLight ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 15, 20, 0.75)',
+                            border: '2px solid var(--accent)',
+                            color: 'var(--text)',
+                            resize: 'none',
+                            textAlign: 'center',
+                            boxSizing: 'border-box',
+                            outline: 'none',
+                            display: 'block',
+                            whiteSpace: 'pre-wrap',
+                            overflowY: 'auto',
+                            scrollbarWidth: 'none',
+                            msOverflowStyle: 'none',
+                          }}
+                        />
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center', userSelect: 'none' }}>
+                          {totalModeOptions > 1 && (
+                            <button
+                              onClick={(e) => deleteItemOption(e, currentFullIdx)}
+                              style={{
+                                width: '34px',
+                                height: '34px',
+                                borderRadius: '50%',
+                                background: 'rgba(255, 70, 70, 0.18)',
+                                border: '1px solid rgba(255, 70, 70, 0.35)',
+                                color: '#ff5252',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                padding: 0,
+                                transition: 'all 0.18s ease',
+                              }}
+                              title="Delete current option"
+                            >
+                              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6" />
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                <line x1="10" y1="11" x2="10" y2="17" />
+                                <line x1="14" y1="11" x2="14" y2="17" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      /* DISPLAY MODE (LARGE FORMATTED MARKDOWN TEXT FLOATING DIRECTLY) */
+                      <AnimatePresence mode="wait">
+                        <motion.div
+                          key={`${currentMode}_${currentFullIdx}`}
+                          initial={{ opacity: 0, y: 6, scale: 0.97 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                          transition={{ duration: 0.16, ease: 'easeOut' }}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            overflowY: 'auto',
+                            scrollbarWidth: 'none',
+                            msOverflowStyle: 'none',
+                            padding: '8px 4px',
+                            boxSizing: 'border-box',
+                          }}
+                        >
+                          <div
+                            className="full-mode-text"
+                            onDoubleClick={() => setEditMode(true)}
+                            style={{
+                              fontSize: dynamicFullFontSize,
+                              fontFamily: "'Google Sans', 'Google Sans Flex', 'Product Sans', 'Plus Jakarta Sans', 'Open Sans', sans-serif",
+                              fontWeight: 800,
+                              lineHeight: 1.25,
+                              color: 'var(--text)',
+                              letterSpacing: '-0.025em',
+                              textAlign: 'center',
+                              wordBreak: 'break-word',
+                              whiteSpace: 'pre-wrap',
+                              maxWidth: '100%',
+                              cursor: 'default',
+                              userSelect: 'text',
+                              scrollbarWidth: 'none',
+                              msOverflowStyle: 'none',
+                              display: 'block',
+                              margin: 'auto 0',
+                              padding: '4px 2px',
+                            }}
+                            title="Double-click to edit"
+                          >
+                            {renderFormattedMarkdown(currentItemText, 900)}
+                          </div>
+                        </motion.div>
+                      </AnimatePresence>
+                    )}
+                  </div>
+
+                  {/* Bottom Navigation: Round Buttons with Icons */}
+                  <div
+                    className="full-mode-nav"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '12px',
+                      width: '100%',
+                      userSelect: 'none',
+                      boxSizing: 'border-box',
+                      paddingTop: '2px',
+                    }}
+                  >
+                    {/* Back Round Button */}
+                    <button
+                      className="full-mode-btn full-mode-back"
+                      onClick={handleFullModePrev}
+                      disabled={currentFullIdx <= 0}
+                      style={{
+                        width: '34px',
+                        height: '34px',
+                        minWidth: '34px',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 0,
+                        background: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.08)',
+                        border: '1px solid ' + (isLight ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.14)'),
+                        color: isLight ? '#0f172a' : '#ffffff',
+                        cursor: currentFullIdx <= 0 ? 'default' : 'pointer',
+                        opacity: currentFullIdx <= 0 ? 0.3 : 1,
+                        transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                      }}
+                      title="Previous item"
+                    >
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="15 18 9 12 15 6" />
+                      </svg>
+                    </button>
+
+                    {/* Step Pill */}
+                    <div
+                      className="full-mode-step-pill"
+                      style={{
+                        padding: '4px 12px',
+                        borderRadius: '999px',
+                        background: isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.06)',
+                        border: '1px solid ' + (isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.1)'),
+                        color: isLight ? 'rgba(0,0,0,0.7)' : 'rgba(255, 255, 255, 0.8)',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        letterSpacing: '0.04em',
+                        whiteSpace: 'nowrap',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      <span>{totalModeOptions > 0 ? currentFullIdx + 1 : 0}</span>
+                      <span style={{ opacity: 0.35 }}>/</span>
+                      <span>{totalModeOptions}</span>
+                    </div>
+
+                    {/* Next Round Button */}
+                    <button
+                      className="full-mode-btn full-mode-next"
+                      onClick={handleFullModeNext}
+                      disabled={currentFullIdx >= totalModeOptions - 1}
+                      style={{
+                        width: '34px',
+                        height: '34px',
+                        minWidth: '34px',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 0,
+                        background: currentFullIdx >= totalModeOptions - 1
+                          ? (isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.08)')
+                          : 'var(--accent)',
+                        border: currentFullIdx >= totalModeOptions - 1
+                          ? '1px solid ' + (isLight ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.14)')
+                          : '1px solid var(--accent)',
+                        color: currentFullIdx >= totalModeOptions - 1
+                          ? (isLight ? '#0f172a' : '#ffffff')
+                          : '#ffffff',
+                        cursor: currentFullIdx >= totalModeOptions - 1 ? 'default' : 'pointer',
+                        opacity: currentFullIdx >= totalModeOptions - 1 ? 0.3 : 1,
+                        transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                      }}
+                      title="Next item"
+                    >
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Add option button if in edit mode */}
+                  {editMode && (
+                    <button
+                      className="add-btn"
+                      style={{ display: 'flex', marginTop: '2px', padding: '6px' }}
+                      onClick={addNewItemOption}
+                    >
+                      <svg viewBox="0 0 24 24">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                      </svg>
+                      Add option
+                    </button>
+                  )}
+                </div>
+              );
+            }
 
             return (
               <div
@@ -4354,12 +5524,13 @@ export default function App() {
 
                 return (
                   <li
-                    className={`option ${isItemChecked ? 'selected' : ''} ${draggedOptionIdx === optionIdx ? 'dragging-option' : ''}`}
+                    className={`option ${isItemChecked ? 'selected' : ''} ${draggedOptionIdx === optionIdx ? 'dragging-option' : ''} ${dragOverOptionIdx === optionIdx && draggedOptionIdx !== optionIdx ? 'drag-over-target' : ''}`}
                     key={optionIdx}
                     onClick={() => handleOptionToggle(optionIdx)}
                     draggable={editMode}
                     onDragStart={(e) => {
                       if (!editMode) return;
+                      e.stopPropagation();
                       setDraggedOptionIdx(optionIdx);
                       e.dataTransfer.setData('text/plain', String(optionIdx));
                       e.dataTransfer.effectAllowed = 'move';
@@ -4367,18 +5538,34 @@ export default function App() {
                     onDragOver={(e) => {
                       if (!editMode) return;
                       e.preventDefault();
+                      e.stopPropagation();
                       e.dataTransfer.dropEffect = 'move';
+                      if (dragOverOptionIdx !== optionIdx) {
+                        setDragOverOptionIdx(optionIdx);
+                      }
+                    }}
+                    onDragLeave={(e) => {
+                      e.stopPropagation();
+                      if (dragOverOptionIdx === optionIdx) {
+                        setDragOverOptionIdx(null);
+                      }
                     }}
                     onDrop={(e) => {
                       if (!editMode) return;
                       e.preventDefault();
+                      e.stopPropagation();
                       const fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
                       if (!isNaN(fromIdx) && fromIdx !== optionIdx) {
                         moveOption(fromIdx, optionIdx);
                       }
                       setDraggedOptionIdx(null);
+                      setDragOverOptionIdx(null);
                     }}
-                    onDragEnd={() => setDraggedOptionIdx(null)}
+                    onDragEnd={(e) => {
+                      e.stopPropagation();
+                      setDraggedOptionIdx(null);
+                      setDragOverOptionIdx(null);
+                    }}
                     style={{ cursor: editMode ? 'grab' : 'pointer' }}
                   >
                     {/* Drag handle icon in edit mode */}
@@ -4428,7 +5615,7 @@ export default function App() {
                         }}
                       />
                     ) : (
-                      <span className="opt-text">{itemText}</span>
+                      <span className="opt-text">{renderFormattedMarkdown(itemText, 900)}</span>
                     )}
 
                     {/* Action reorder & delete buttons in edit mode */}
@@ -4533,6 +5720,7 @@ export default function App() {
         <div style={{ display: activeApp === 'calendar' ? 'contents' : 'none' }}>
           <FxCalendar
             isLight={isLight}
+            isEyeMode={isEyeMode}
             minimized={minimized}
             onBackToChecklist={() => setActiveApp('checklist')}
             settingsPanelOpen={calendarSettingsOpen}

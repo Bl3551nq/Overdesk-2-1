@@ -5,6 +5,24 @@ const crypto = require('crypto');
 const os = require('os');
 const { autoUpdater } = require('electron-updater');
 
+// Ensure single instance of the application
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  // Another instance is already running; quit this duplicate instance immediately
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    // When a second instance is launched (e.g. from Start Menu, Desktop, or duplicate click),
+    // restore and focus the existing window instead of opening a new one
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      if (!mainWindow.isVisible()) mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
 // Keep variables in higher scope to prevent garbage collection
 let mainWindow = null;
 let tray = null;
@@ -251,10 +269,25 @@ app.on('before-quit', () => {
 let isUpdateDownloaded = false;
 let userRequestedInstall = false;
 
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
+
+autoUpdater.on('checking-for-update', () => {
+  if (mainWindow) {
+    mainWindow.webContents.send('checking-for-update');
+  }
+});
+
 autoUpdater.on('update-available', (info) => {
   isUpdateDownloaded = false;
   if (mainWindow) {
     mainWindow.webContents.send('update-available', info.version);
+  }
+});
+
+autoUpdater.on('update-not-available', (info) => {
+  if (mainWindow) {
+    mainWindow.webContents.send('update-not-available', info ? info.version : app.getVersion());
   }
 });
 
@@ -264,10 +297,10 @@ autoUpdater.on('download-progress', (progressObj) => {
   }
 });
 
-autoUpdater.on('update-downloaded', () => {
+autoUpdater.on('update-downloaded', (info) => {
   isUpdateDownloaded = true;
   if (mainWindow) {
-    mainWindow.webContents.send('update-downloaded');
+    mainWindow.webContents.send('update-downloaded', info ? info.version : '');
   }
   if (userRequestedInstall) {
     isQuitting = true;
@@ -278,12 +311,12 @@ autoUpdater.on('update-downloaded', () => {
 autoUpdater.on('error', (err) => {
   console.error('AutoUpdater error:', err);
   if (mainWindow) {
-    let cleanMessage = 'Update failed to download. Please check back later.';
+    let cleanMessage = 'Update check failed. Please check back later.';
     const rawMsg = err ? (err.message || String(err)) : '';
     if (rawMsg.includes('404') || rawMsg.includes('releases/download') || rawMsg.includes('github.com')) {
       cleanMessage = 'Update package file not found on GitHub release (404). Check release asset filename.';
     } else if (rawMsg.includes('net::ERR_') || rawMsg.includes('ENOTFOUND')) {
-      cleanMessage = 'Network connection error while downloading update.';
+      cleanMessage = 'Network connection error while checking for updates.';
     }
     mainWindow.webContents.send('update-error', cleanMessage);
   }
@@ -306,8 +339,23 @@ app.whenReady().then(() => {
     console.error('Failed to configure launch on startup:', err);
   }
 
+  // Automatically check for updates on startup after 2 seconds
+  setTimeout(() => {
+    try {
+      autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+        console.error('AutoUpdater startup check error:', err);
+      });
+    } catch (err) {
+      console.error('AutoUpdater startup check catch:', err);
+    }
+  }, 2000);
+
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      if (!mainWindow.isVisible()) mainWindow.show();
+      mainWindow.focus();
+    } else if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
     }
   });
@@ -364,13 +412,361 @@ app.on('window-all-closed', () => {
    IPC HANDLERS (License Validation & Window Controls)
 ═══════════════════════════════════════════════════════ */
 
-// Check if license is already validated
-ipcMain.handle('check-license', () => {
+/* ═══════════════════════════════════════════════════════
+   5-DAY PERSISTENT HARDWARE & IP TRIAL ENGINE
+═══════════════════════════════════════════════════════ */
+
+const SYS_TRIAL_FILE = path.join(os.homedir(), '.overdesk_nexus_sys.dat');
+const SYS_TRIAL_FILE_ALT = path.join(os.homedir(), '.overdesk_lock.sys');
+const SYS_TRIAL_FILE_APP = path.join(app.getPath('userData'), '.overdesk_sys_lock.dat');
+
+function getLocalIpAddress() {
+  try {
+    const interfaces = os.networkInterfaces();
+    for (const devName in interfaces) {
+      const iface = interfaces[devName];
+      if (!iface) continue;
+      for (let i = 0; i < iface.length; i++) {
+        const alias = iface[i];
+        if (alias.family === 'IPv4' && !alias.internal) {
+          return alias.address;
+        }
+      }
+    }
+  } catch (e) {}
+  return '127.0.0.1';
+}
+
+function saveSystemTrialRecord(trialRecord) {
+  const payload = JSON.stringify(trialRecord, null, 2);
+  try { fs.writeFileSync(SYS_TRIAL_FILE, payload, 'utf8'); } catch (err) {}
+  try { fs.writeFileSync(SYS_TRIAL_FILE_ALT, payload, 'utf8'); } catch (err) {}
+  try { fs.writeFileSync(SYS_TRIAL_FILE_APP, payload, 'utf8'); } catch (err) {}
+  writeConfig({ trialRecord });
+}
+
+function getSystemTrialRecord() {
+  const machineId = getMachineId();
+  const currentIp = getLocalIpAddress();
+  const records = [];
+
+  // Read all persistent location records
+  try {
+    if (fs.existsSync(SYS_TRIAL_FILE)) {
+      records.push(JSON.parse(fs.readFileSync(SYS_TRIAL_FILE, 'utf8')));
+    }
+  } catch (err) {}
+
+  try {
+    if (fs.existsSync(SYS_TRIAL_FILE_ALT)) {
+      records.push(JSON.parse(fs.readFileSync(SYS_TRIAL_FILE_ALT, 'utf8')));
+    }
+  } catch (err) {}
+
+  try {
+    if (fs.existsSync(SYS_TRIAL_FILE_APP)) {
+      records.push(JSON.parse(fs.readFileSync(SYS_TRIAL_FILE_APP, 'utf8')));
+    }
+  } catch (err) {}
+
   const config = readConfig();
-  if (config.licenseValid) {
-    return { ok: true, key: config.licenseKey };
+  if (config.trialRecord) {
+    records.push(config.trialRecord);
   }
-  return { ok: false };
+
+  let trialRecord = null;
+  let isPermanentlyExpired = false;
+  let isUsed = false;
+  let isStarted = false;
+  let earliestStart = Infinity;
+
+  for (const r of records) {
+    if (!r) continue;
+    if (r.trialExpired === true || r.permanentlyLocked === true) {
+      isPermanentlyExpired = true;
+    }
+    if (r.trialUsed === true) {
+      isUsed = true;
+    }
+    if (r.trialStarted === true) {
+      isStarted = true;
+    }
+    if (typeof r.trialStartDate === 'number' && r.trialStartDate < earliestStart) {
+      earliestStart = r.trialStartDate;
+      trialRecord = { ...r };
+    }
+  }
+
+  if (!trialRecord) {
+    trialRecord = {
+      trialStarted: isStarted,
+      trialUsed: isUsed || isPermanentlyExpired,
+      trialStartDate: isStarted ? (earliestStart !== Infinity ? earliestStart : Date.now()) : null,
+      machineId,
+      firstIp: currentIp,
+      created: new Date().toISOString()
+    };
+  } else {
+    trialRecord.trialStarted = isStarted || Boolean(trialRecord.trialStarted);
+    trialRecord.trialUsed = isUsed || isPermanentlyExpired || Boolean(trialRecord.trialUsed);
+    if (earliestStart !== Infinity) {
+      trialRecord.trialStartDate = earliestStart;
+    }
+  }
+
+  if (trialRecord.trialStarted && trialRecord.trialStartDate) {
+    const now = Date.now();
+    const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
+    if (isPermanentlyExpired || (now - trialRecord.trialStartDate >= FIVE_DAYS_MS)) {
+      trialRecord.trialExpired = true;
+      trialRecord.permanentlyLocked = true;
+      trialRecord.trialUsed = true;
+    }
+  }
+
+  trialRecord.machineId = trialRecord.machineId || machineId;
+  trialRecord.firstIp = trialRecord.firstIp || currentIp;
+  trialRecord.lastSeenTime = Math.max(trialRecord.lastSeenTime || 0, Date.now());
+
+  saveSystemTrialRecord(trialRecord);
+
+  return trialRecord;
+}
+
+// Handler to start 5-day trial explicitly on button click
+ipcMain.handle('start-trial', (event) => {
+  const trial = getSystemTrialRecord();
+
+  if (trial.trialUsed || trial.trialExpired || trial.permanentlyLocked) {
+    return {
+      ok: false,
+      trialUsed: true,
+      error: 'Your free trial has already been used. Please purchase a license to continue.'
+    };
+  }
+
+  const startTime = Date.now();
+  trial.trialStarted = true;
+  trial.trialUsed = true;
+  trial.trialStartDate = startTime;
+  trial.trialExpired = false;
+  trial.permanentlyLocked = false;
+
+  saveSystemTrialRecord(trial);
+
+  return {
+    ok: true,
+    isTrial: true,
+    trialStarted: true,
+    trialUsed: true,
+    trialExpired: false,
+    dayNumber: 1,
+    daysLeft: 5,
+    hoursLeft: 120,
+    trialStartDate: startTime
+  };
+});
+
+// Check license and trial status
+ipcMain.handle('check-license', (event, simDay) => {
+  const config = readConfig();
+  const encrypted = readEncryptedLicense();
+  const sysTrial = getSystemTrialRecord();
+
+  let isActivated = Boolean(config.licenseValid || (encrypted && encrypted.licenseKey) || sysTrial.licenseValid);
+  const savedPlanType = config.planType || encrypted?.planType || sysTrial.planType || '';
+  const savedVariantName = config.variantName || encrypted?.variantName || sysTrial.variantName || '';
+  const activatedAt = config.activatedAt || encrypted?.activatedAt || sysTrial.activatedAt || 0;
+  const storedExpiresAt = config.expiresAt || encrypted?.expiresAt || sysTrial.expiresAt || null;
+
+  // If activated with a paid or trial key
+  if (isActivated) {
+    const isTrialKey = savedPlanType === 'trial' || 
+      savedVariantName.toLowerCase().includes('trial') || 
+      savedVariantName.toLowerCase().includes('trail') || 
+      savedVariantName.toLowerCase().includes('5-day') || 
+      savedVariantName.toLowerCase().includes('5 day') || 
+      savedVariantName.toLowerCase().includes('5-trading') || 
+      savedVariantName.toLowerCase().includes('free');
+
+    const isAnnual = !isTrialKey && (savedPlanType === 'annual' || savedVariantName.toLowerCase().includes('annual') || savedVariantName.toLowerCase().includes('year'));
+    const isLifetime = !isTrialKey && !isAnnual && (savedPlanType === 'lifetime' || savedVariantName.toLowerCase().includes('lifetime'));
+
+    if (isLifetime) {
+      // Lifetime License: NEVER expires, NEVER locks!
+      return {
+        ok: true,
+        isTrial: false,
+        licenseValid: true,
+        planType: 'lifetime',
+        variantName: savedVariantName || 'Lifetime Access',
+        key: config.licenseKey || encrypted?.licenseKey || sysTrial.licenseKey
+      };
+    } else if (isTrialKey) {
+      // 5-Day Trial Key
+      const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
+      const trialExpiresAt = storedExpiresAt || (activatedAt > 0 ? (activatedAt + FIVE_DAYS_MS) : 0);
+
+      if (trialExpiresAt > 0 && Date.now() >= trialExpiresAt) {
+        const expiredKey = config.licenseKey || encrypted?.licenseKey || sysTrial.licenseKey || '';
+        const currentExpiredKeys = config.expiredLicenseKeys || [];
+        const currentUsedTrial = config.usedTrialKeys || [];
+        const updatedExpiredKeys = expiredKey ? Array.from(new Set([...currentExpiredKeys, expiredKey.toUpperCase(), expiredKey])) : currentExpiredKeys;
+        const updatedUsedTrial = expiredKey ? Array.from(new Set([...currentUsedTrial, expiredKey.toUpperCase(), expiredKey])) : currentUsedTrial;
+
+        writeConfig({
+          licenseValid: false,
+          licenseExpired: true,
+          licenseKey: null,
+          expiredLicenseKeys: updatedExpiredKeys,
+          usedTrialKeys: updatedUsedTrial
+        });
+
+        if (sysTrial) {
+          sysTrial.licenseValid = false;
+          sysTrial.licenseExpired = true;
+          sysTrial.licenseKey = null;
+          sysTrial.expiredLicenseKeys = updatedExpiredKeys;
+          sysTrial.usedTrialKeys = updatedUsedTrial;
+          try {
+            fs.writeFileSync(SYS_TRIAL_FILE, JSON.stringify(sysTrial, null, 2), 'utf8');
+          } catch (e) {}
+        }
+
+        return {
+          ok: false,
+          isTrial: false,
+          licenseValid: false,
+          licenseExpired: true,
+          trialExpired: true,
+          planType: 'trial',
+          expiresAt: trialExpiresAt,
+          error: 'Your 5-day trial period has expired. Please purchase an Annual or Lifetime license at overdesk.store.'
+        };
+      }
+
+      const daysRemaining = Math.max(1, Math.ceil((trialExpiresAt - Date.now()) / (24 * 60 * 60 * 1000)));
+      return {
+        ok: true,
+        isTrial: true,
+        licenseValid: true,
+        licenseExpired: false,
+        planType: 'trial',
+        variantName: savedVariantName || '5-Day Trial',
+        expiresAt: trialExpiresAt,
+        daysRemaining,
+        key: config.licenseKey || encrypted?.licenseKey || sysTrial.licenseKey
+      };
+    } else {
+      // Subscription / Annual / Dated Plan: Calculate expiration
+      let expiresAt = storedExpiresAt;
+      if (!expiresAt && activatedAt > 0) {
+        if (savedPlanType === 'annual') {
+          expiresAt = activatedAt + (365 * 24 * 60 * 60 * 1000);
+        } else if (savedPlanType === 'monthly') {
+          expiresAt = activatedAt + (30 * 24 * 60 * 60 * 1000);
+        }
+      }
+
+      if (expiresAt && Date.now() >= expiresAt) {
+        // License EXPIRED! Lock app back to license page & blacklist this expired key
+        const expiredKey = config.licenseKey || encrypted?.licenseKey || sysTrial.licenseKey || '';
+        const currentExpiredKeys = config.expiredLicenseKeys || [];
+        const updatedExpiredKeys = expiredKey ? Array.from(new Set([...currentExpiredKeys, expiredKey.toUpperCase(), expiredKey])) : currentExpiredKeys;
+
+        writeConfig({
+          licenseValid: false,
+          licenseExpired: true,
+          licenseKey: null,
+          expiredLicenseKeys: updatedExpiredKeys
+        });
+
+        if (sysTrial) {
+          sysTrial.licenseValid = false;
+          sysTrial.licenseExpired = true;
+          sysTrial.licenseKey = null;
+          sysTrial.expiredLicenseKeys = updatedExpiredKeys;
+          try {
+            fs.writeFileSync(SYS_TRIAL_FILE, JSON.stringify(sysTrial, null, 2), 'utf8');
+          } catch (e) {}
+        }
+
+        return {
+          ok: false,
+          isTrial: false,
+          licenseValid: false,
+          licenseExpired: true,
+          planType: savedPlanType,
+          expiresAt,
+          error: 'Your license subscription has expired. Please enter a valid license key or purchase a new one at overdesk.store.'
+        };
+      }
+
+      return {
+        ok: true,
+        isTrial: false,
+        licenseValid: true,
+        licenseExpired: false,
+        planType: savedPlanType,
+        variantName: savedVariantName,
+        expiresAt,
+        key: config.licenseKey || encrypted?.licenseKey || sysTrial.licenseKey
+      };
+    }
+  }
+
+  // Not activated with paid key -> Check trial status
+  const trial = sysTrial;
+  const trialStarted = Boolean(trial.trialStarted);
+  const trialUsed = Boolean(trial.trialUsed || trial.trialStarted || trial.permanentlyLocked);
+
+  if (!trialStarted) {
+    // Trial NOT started yet -> Default opening screen (License Page)
+    return {
+      ok: false,
+      isTrial: true,
+      trialStarted: false,
+      trialUsed: trialUsed,
+      trialExpired: false,
+      licenseValid: false
+    };
+  }
+
+  // Trial IS started -> Check 5-day expiration
+  let now = Date.now();
+  if (typeof simDay === 'number' && simDay >= 1 && trial.trialStartDate) {
+    now = trial.trialStartDate + (simDay - 1) * 24 * 60 * 60 * 1000 + 1000;
+  }
+
+  const elapsedMs = trial.trialStartDate ? Math.max(0, now - trial.trialStartDate) : 0;
+  const elapsedDaysDecimal = elapsedMs / (1000 * 60 * 60 * 24);
+  const isExpired = trial.trialExpired || trial.permanentlyLocked || elapsedDaysDecimal >= 5;
+
+  if (isExpired && (!trial.trialExpired || !trial.permanentlyLocked)) {
+    trial.trialExpired = true;
+    trial.permanentlyLocked = true;
+    trial.trialUsed = true;
+    saveSystemTrialRecord(trial);
+  }
+
+  const dayNumber = isExpired ? 6 : Math.min(5, Math.floor(elapsedDaysDecimal) + 1);
+  const daysLeft = isExpired ? 0 : Math.max(0, Math.ceil(5 - elapsedDaysDecimal));
+  const hoursLeft = isExpired ? 0 : Math.max(0, Math.ceil((5 * 24) - (elapsedMs / (1000 * 60 * 60))));
+
+  return {
+    ok: !isExpired,
+    isTrial: true,
+    trialStarted: true,
+    trialUsed: true,
+    licenseValid: false,
+    trialExpired: isExpired,
+    dayNumber,
+    daysLeft,
+    hoursLeft,
+    trialStartDate: trial.trialStartDate,
+    machineId: trial.machineId,
+    ip: trial.firstIp
+  };
 });
 
 // Gumroad License verify
@@ -392,9 +788,9 @@ function getMachineId() {
 
 const ENCRYPTION_KEY = crypto.createHash('sha256').update('OverdeskNexusLicenseSalt2026').digest();
 
-function writeEncryptedLicense(licenseKey, machineId) {
+function writeEncryptedLicense(licenseKey, machineId, planType = 'lifetime', variantName = 'Lifetime Access', activatedAt = Date.now()) {
   try {
-    const data = JSON.stringify({ licenseKey, machineId });
+    const data = JSON.stringify({ licenseKey, machineId, planType, variantName, activatedAt });
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
     let encrypted = cipher.update(data, 'utf8', 'hex');
@@ -424,24 +820,45 @@ function readEncryptedLicense() {
 ipcMain.handle('validate-license', async (event, rawKey) => {
   const licenseKey = rawKey.trim();
   const normalizedKey = licenseKey.toUpperCase();
-  const cleanedKey = normalizedKey.replace(/[^A-Z0-9]/g, '');
 
-  // Support offline/testing authorization override keys
-  if (
-    normalizedKey === 'TEST-LICENSE-KEY' ||
-    normalizedKey === 'OVERDESK-TEST-KEY-2026' ||
-    normalizedKey === 'TEST-1234-5678-90AB-CDEF-1234-5678' ||
-    normalizedKey === '6F0E4C97-B72A4E69-A11BF6C4-AF6517E7' ||
-    (cleanedKey.length === 32 && cleanedKey.startsWith('TEST'))
-  ) {
-    writeConfig({ licenseValid: true, licenseKey });
-    return { ok: true, test: true };
-  }
-
+  const config = readConfig();
+  const sysTrial = getSystemTrialRecord();
   const currentMachineId = getMachineId();
   const storedLicense = readEncryptedLicense();
+
+  // Check if this key was already blacklisted/recorded as expired
+  const allExpiredKeys = [
+    ...(config.expiredLicenseKeys || []),
+    ...(sysTrial.expiredLicenseKeys || []),
+    ...(config.usedTrialKeys || []),
+    ...(sysTrial.usedTrialKeys || [])
+  ].map(k => String(k).trim().toUpperCase());
+
+  if (allExpiredKeys.includes(normalizedKey)) {
+    return { ok: false, error: 'This license key has expired and cannot be reused. Please renew or purchase a new license at overdesk.store.' };
+  }
+
+  // Check if already activated on this machine and already past expiration
+  if (storedLicense && storedLicense.licenseKey && storedLicense.licenseKey.toUpperCase() === normalizedKey && storedLicense.machineId === currentMachineId) {
+    if (storedLicense.planType === 'annual' && storedLicense.activatedAt) {
+      const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+      if (Date.now() - storedLicense.activatedAt >= ONE_YEAR_MS) {
+        const updatedExpired = Array.from(new Set([...allExpiredKeys, normalizedKey, licenseKey]));
+        writeConfig({ expiredLicenseKeys: updatedExpired, licenseValid: false, licenseExpired: true, licenseKey: null });
+        return { ok: false, error: 'This license key has expired and cannot be reused. Please purchase a new license at overdesk.store.' };
+      }
+    } else if (storedLicense.planType === 'trial' && storedLicense.activatedAt) {
+      const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
+      if (Date.now() - storedLicense.activatedAt >= FIVE_DAYS_MS) {
+        const updatedExpired = Array.from(new Set([...allExpiredKeys, normalizedKey, licenseKey]));
+        writeConfig({ expiredLicenseKeys: updatedExpired, usedTrialKeys: updatedExpired, licenseValid: false, licenseExpired: true, licenseKey: null });
+        return { ok: false, error: 'This trial license key has expired. Please purchase an Annual or Lifetime license at overdesk.store.' };
+      }
+    }
+  }
+
   const alreadyActivatedThisMachine = storedLicense && 
-    storedLicense.licenseKey.toUpperCase() === licenseKey.toUpperCase() && 
+    storedLicense.licenseKey.toUpperCase() === normalizedKey && 
     storedLicense.machineId === currentMachineId;
   
   // Always call Gumroad with increment_uses_count: false after the first activation so the count stays at 1 and is only used as a flag
@@ -551,9 +968,150 @@ ipcMain.handle('validate-license', async (event, rawKey) => {
       }
 
       if (uses === 1 || storedMachineId === currentMachineId) {
-        writeEncryptedLicense(licenseKey, currentMachineId);
-        writeConfig({ licenseValid: true, licenseKey });
-        return { ok: true };
+        // Extract plan variant (Trial vs Annual vs Lifetime)
+        const rawVariant = (data.purchase && (
+          data.purchase.variant_name || 
+          data.purchase.option || 
+          (data.purchase.variants && Object.values(data.purchase.variants).join(' ')) ||
+          data.purchase.option_id
+        )) || '';
+
+        const fullCheckStr = (
+          rawVariant + ' ' + 
+          (data.product_name || '') + ' ' + 
+          (data.product_permalink || '') + ' ' + 
+          (data.purchase && data.purchase.product_name ? data.purchase.product_name : '') + ' ' + 
+          (data.purchase && data.purchase.permalink ? data.purchase.permalink : '') + ' ' + 
+          JSON.stringify(data.purchase || {})
+        ).toLowerCase();
+
+        const isPriceZero = Boolean(data.purchase && (data.purchase.price === 0 || data.purchase.price === '0' || data.purchase.free_trial));
+        const isTrialMatch = isPriceZero ||
+          fullCheckStr.includes('qllzvmpqab6m9w92clrjyw') || 
+          fullCheckStr.includes('trial') || 
+          fullCheckStr.includes('trail') || 
+          fullCheckStr.includes('5-day') || 
+          fullCheckStr.includes('5 day') || 
+          fullCheckStr.includes('5-trading') || 
+          fullCheckStr.includes('5 trading') || 
+          fullCheckStr.includes('sample') || 
+          fullCheckStr.includes('free');
+
+        const isAnnualMatch = !isTrialMatch && (
+          fullCheckStr.includes('dih5cg0o3nvuoef7xrhtyw') || 
+          fullCheckStr.includes('annual') || 
+          fullCheckStr.includes('yearly') || 
+          fullCheckStr.includes('1-year') || 
+          fullCheckStr.includes('1 year') || 
+          fullCheckStr.includes('subscription') || 
+          Boolean(data.purchase && data.purchase.subscription_id)
+        );
+
+        const isLifetimeMatch = !isTrialMatch && !isAnnualMatch && (
+          fullCheckStr.includes('z7fdvim6isjecljzypubqw') || 
+          fullCheckStr.includes('lifetime') || 
+          fullCheckStr.includes('perpetual') || 
+          fullCheckStr.includes('one-time')
+        );
+
+        let planType = 'trial';
+        let variantName = rawVariant || '5-Day Trial';
+
+        if (isTrialMatch) {
+          planType = 'trial';
+          variantName = rawVariant || '5-Day Trial Access';
+        } else if (isAnnualMatch) {
+          planType = 'annual';
+          variantName = rawVariant || 'Annual Subscription (1 Year)';
+        } else if (isLifetimeMatch) {
+          planType = 'lifetime';
+          variantName = rawVariant || 'Lifetime Access';
+        } else {
+          // If price is 0 or variant is unconfirmed, treat as 5-Day Trial for safety
+          if (isPriceZero) {
+            planType = 'trial';
+            variantName = '5-Day Trial Access';
+          } else {
+            planType = 'trial';
+            variantName = rawVariant || '5-Day Trial Access';
+          }
+        }
+
+        // Check if trial key was previously used and expired on this machine
+        const currentConfig = readConfig();
+        const usedTrialKeys = currentConfig.usedTrialKeys || [];
+        const expiredKeys = currentConfig.expiredLicenseKeys || [];
+
+        if (planType === 'trial') {
+          if (usedTrialKeys.includes(licenseKey) || usedTrialKeys.includes(normalizedKey)) {
+            return { ok: false, error: 'This trial license key has already been used and expired. Please purchase an Annual or Lifetime license at overdesk.store.' };
+          }
+          if (data.purchase && data.purchase.created_at) {
+            const pTime = new Date(data.purchase.created_at).getTime();
+            if (!isNaN(pTime) && (Date.now() - pTime >= 5 * 24 * 60 * 60 * 1000)) {
+              const updatedExpired = Array.from(new Set([...expiredKeys, ...usedTrialKeys, normalizedKey, licenseKey]));
+              writeConfig({ expiredLicenseKeys: updatedExpired, usedTrialKeys: updatedExpired });
+              return { ok: false, error: 'This trial license key has expired. Please purchase an Annual or Lifetime license at overdesk.store.' };
+            }
+          }
+        }
+
+        // Check if annual subscription has ended, cancelled, or 1 year has passed
+        if (planType === 'annual') {
+          if (data.purchase && (data.purchase.subscription_ended_at || data.purchase.subscription_cancelled_at || data.purchase.subscription_failed_at)) {
+            const endDateStr = data.purchase.subscription_ended_at || data.purchase.subscription_cancelled_at || data.purchase.subscription_failed_at;
+            const endDate = new Date(endDateStr).getTime();
+            if (endDate < Date.now()) {
+              const updatedExpired = Array.from(new Set([...expiredKeys, normalizedKey, licenseKey]));
+              writeConfig({ expiredLicenseKeys: updatedExpired });
+              return { ok: false, error: 'Your annual subscription has ended or was cancelled. Please renew or purchase at overdesk.store.' };
+            }
+          }
+          if (data.purchase && data.purchase.created_at && !data.purchase.subscription_id) {
+            const pTime = new Date(data.purchase.created_at).getTime();
+            if (!isNaN(pTime) && (Date.now() - pTime >= 365 * 24 * 60 * 60 * 1000)) {
+              const updatedExpired = Array.from(new Set([...expiredKeys, normalizedKey, licenseKey]));
+              writeConfig({ expiredLicenseKeys: updatedExpired });
+              return { ok: false, error: 'This annual license key has expired (1 year subscription elapsed). Please renew at overdesk.store.' };
+            }
+          }
+        }
+
+        const nowTime = (storedLicense && storedLicense.licenseKey && storedLicense.licenseKey.toUpperCase() === normalizedKey && storedLicense.activatedAt)
+          ? storedLicense.activatedAt
+          : Date.now();
+        const updatedUsedTrialKeys = planType === 'trial' ? Array.from(new Set([...usedTrialKeys, licenseKey, normalizedKey])) : usedTrialKeys;
+
+        writeEncryptedLicense(licenseKey, currentMachineId, planType, variantName, nowTime);
+        writeConfig({ 
+          licenseValid: true, 
+          licenseExpired: false,
+          licenseKey, 
+          planType, 
+          variantName, 
+          activatedAt: nowTime, 
+          usedTrialKeys: updatedUsedTrialKeys 
+        });
+
+        try {
+          const sysTrial = getSystemTrialRecord();
+          sysTrial.licenseValid = true;
+          sysTrial.licenseKey = licenseKey;
+          sysTrial.planType = planType;
+          sysTrial.variantName = variantName;
+          sysTrial.activatedAt = nowTime;
+          sysTrial.usedTrialKeys = updatedUsedTrialKeys;
+          fs.writeFileSync(SYS_TRIAL_FILE, JSON.stringify(sysTrial, null, 2), 'utf8');
+        } catch (e) {}
+
+        return { 
+          ok: true, 
+          isTrial: planType === 'trial', 
+          planType, 
+          variantName,
+          expiresAt: planType === 'trial' ? (nowTime + 5 * 24 * 60 * 60 * 1000) : (planType === 'annual' ? (nowTime + 365 * 24 * 60 * 60 * 1000) : null),
+          daysRemaining: planType === 'trial' ? Math.max(1, Math.ceil(((nowTime + 5 * 24 * 60 * 60 * 1000) - Date.now()) / (24 * 60 * 60 * 1000))) : undefined
+        };
       }
     }
 
@@ -758,6 +1316,16 @@ ipcMain.on('save-icon', (event, dataUrl) => {
     }
   } catch (err) {
     console.error('Error saving dynamic icon:', err);
+  }
+});
+
+ipcMain.on('check-for-updates', () => {
+  try {
+    autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+      console.error('Error checking for updates on IPC request:', err);
+    });
+  } catch (err) {
+    console.error('Catch checking for updates on IPC request:', err);
   }
 });
 
